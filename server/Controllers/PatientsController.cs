@@ -40,7 +40,7 @@ namespace server.Controllers
                     dateOfBirth = p.DateOfBirth.ToString("yyyy-MM-dd"),
                     age = CalculateAge(p.DateOfBirth),
                     totalVisits = p.Appointments.Count,
-                    totalSpent = p.Invoices.Sum(i => i.Transaction.Amount)
+                    totalSpent = p.Invoices.Sum(i => i.Transaction != null ? i.Transaction.Amount : 0)
                 })
                 .ToListAsync();
 
@@ -81,7 +81,7 @@ namespace server.Controllers
                     doctor = a.Doctor != null ? a.Doctor.Name : "N/A",
                     status = a.Status
                 }).ToList(),
-                totalSpent = patient.Invoices.Sum(i => i.Transaction.Amount)
+                totalSpent = patient.Invoices.Sum(i => i.Transaction != null ? i.Transaction.Amount : 0)
             });
         }
 

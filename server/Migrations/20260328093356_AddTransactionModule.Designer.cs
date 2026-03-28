@@ -12,8 +12,8 @@ using server.Data;
 namespace server.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260118115035_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260328093356_AddTransactionModule")]
+    partial class AddTransactionModule
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -119,42 +119,23 @@ namespace server.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(12,2)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTime>("DueDate")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<DateTime>("GeneratedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("InvoiceNumber")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .IsRequired()
+                        .HasColumnType("text");
 
-                    b.Property<DateTime>("IssueDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("PaidDate")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
 
                     b.Property<int>("PatientId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<int?>("TransactionId")
+                    b.Property<int>("TransactionId")
                         .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
@@ -163,7 +144,7 @@ namespace server.Migrations
                     b.HasIndex("TransactionId")
                         .IsUnique();
 
-                    b.ToTable("Invoices");
+                    b.ToTable("Invoices", (string)null);
                 });
 
             modelBuilder.Entity("server.Data.Models.LabTest", b =>
@@ -274,10 +255,32 @@ namespace server.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Department")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
 
@@ -337,7 +340,10 @@ namespace server.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("Amount")
-                        .HasColumnType("numeric(12,2)");
+                        .HasColumnType("numeric");
+
+                    b.Property<int?>("AppointmentId")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -347,8 +353,9 @@ namespace server.Migrations
                     b.Property<int?>("DoctorId")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("InvoiceId")
-                        .HasColumnType("integer");
+                    b.Property<string>("Notes")
+                        .HasColumnType("text")
+                        .HasColumnName("TreatmentNotes");
 
                     b.Property<int?>("NurseId")
                         .HasColumnType("integer");
@@ -369,31 +376,18 @@ namespace server.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
-                    b.Property<bool>("ReportAvailable")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("ReportFilePath")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                    b.Property<string>("ReportUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("ReportFilePath");
 
                     b.Property<int?>("TransactionId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("TreatmentNotes")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("DoctorId");
+                    b.HasIndex("AppointmentId");
 
-                    b.HasIndex("InvoiceId");
+                    b.HasIndex("DoctorId");
 
                     b.HasIndex("NurseId");
 
@@ -612,12 +606,14 @@ namespace server.Migrations
                     b.HasOne("server.Data.Models.Patient", "Patient")
                         .WithMany("Invoices")
                         .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.SetNull)
                         .IsRequired();
 
                     b.HasOne("server.Data.Models.Transaction", "Transaction")
                         .WithOne("Invoice")
-                        .HasForeignKey("server.Data.Models.Invoice", "TransactionId");
+                        .HasForeignKey("server.Data.Models.Invoice", "TransactionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Patient");
 
@@ -652,18 +648,20 @@ namespace server.Migrations
 
             modelBuilder.Entity("server.Data.Models.Procedure", b =>
                 {
+                    b.HasOne("server.Data.Models.Appointment", "Appointment")
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("server.Data.Models.Doctor", "Doctor")
                         .WithMany()
                         .HasForeignKey("DoctorId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("server.Data.Models.Invoice", "Invoice")
-                        .WithMany()
-                        .HasForeignKey("InvoiceId");
-
                     b.HasOne("server.Data.Models.Nurse", "Nurse")
                         .WithMany()
-                        .HasForeignKey("NurseId");
+                        .HasForeignKey("NurseId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("server.Data.Models.Patient", "Patient")
                         .WithMany()
@@ -676,9 +674,9 @@ namespace server.Migrations
                         .HasForeignKey("server.Data.Models.Procedure", "TransactionId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("Doctor");
+                    b.Navigation("Appointment");
 
-                    b.Navigation("Invoice");
+                    b.Navigation("Doctor");
 
                     b.Navigation("Nurse");
 

@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Appointments from "./pages/Appointments";
 import Doctors from "./pages/Doctors";
+import Nurses from "./pages/Nurses";
 import Patients from "./pages/Patients";
 import Procedures from "./pages/Procedures";
 import Laboratory from "./pages/Laboratory";
@@ -36,6 +37,7 @@ const App = () => (
             <Route index element={<Navigate to="appointments" replace />} />
             <Route path="appointments" element={<Appointments />} />
             <Route path="doctors" element={<Doctors />} />
+            <Route path="nurses" element={<Nurses />} />
             <Route path="patients" element={<Patients />} />
             <Route path="procedures" element={<Procedures />} />
             <Route path="laboratory" element={<Laboratory />} />

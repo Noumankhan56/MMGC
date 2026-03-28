@@ -183,3 +183,5 @@ C:\Users\user\OneDrive\Desktop\MMGC\server\bin\Debug\net9.0\runtimes\win-x86\nat
 C:\Users\user\OneDrive\Desktop\MMGC\server\bin\Debug\net9.0\runtimes\win-x86\native\qpdf.dll
 C:\Users\user\OneDrive\Desktop\MMGC\server\bin\Debug\net9.0\runtimes\win-x86\native\zlib1.dll
 C:\Users\user\OneDrive\Desktop\MMGC\server\bin\Debug\net9.0\runtimes\win\lib\net9.0\System.Security.Cryptography.Pkcs.dll
+C:\Users\user\OneDrive\Desktop\MMGC\server\obj\Debug\net9.0\server.sourcelink.json
+C:\Users\user\OneDrive\Desktop\MMGC\server\bin\Debug\net9.0\server.staticwebassets.runtime.json

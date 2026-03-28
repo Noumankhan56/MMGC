@@ -1,108 +1,58 @@
-using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace server.Data.Models
 {
+    /// <summary>
+    /// FR5: Medical Procedures and Treatments
+    /// Aligned with actual PostgreSQL "Procedures" table schema.
+    /// </summary>
+    [Table("Procedures")]
     public class Procedure
     {
         [Key]
         public int Id { get; set; }
 
+        // FR5.1 - Procedure type (Normal Delivery, C-Section, Ultrasound, Surgery, etc.)
         [Required]
-        public int PatientId { get; set; }
+        [MaxLength(150)]
+        public string ProcedureType { get; set; } = "";
 
-        [ForeignKey("PatientId")]
-        public virtual Patient Patient { get; set; } = null!;
-
-        public int? DoctorId { get; set; }
-
-        [ForeignKey("DoctorId")]
-        public virtual Doctor? Doctor { get; set; }
-
-        public int? NurseId { get; set; }
-
-        [ForeignKey("NurseId")]
-        public virtual Nurse? Nurse { get; set; }
-
-        [Required]
-        [StringLength(100)]
-        public string ProcedureType { get; set; } = string.Empty;
-
-        [Column(TypeName = "text")]
-        public string? TreatmentNotes { get; set; }
-
-        [Column(TypeName = "text")]
-        public string? Prescription { get; set; }
-
-        [Column(TypeName = "decimal(10,2)")]
+        [Column(TypeName = "numeric")]
         public decimal Amount { get; set; }
 
-        public string? ReportFilePath { get; set; }
-
-        public bool ReportAvailable { get; set; } = false;
-
-        public int? InvoiceId { get; set; }
-
-        [ForeignKey("InvoiceId")]
-        public virtual Invoice? Invoice { get; set; }
-
-        public int? TransactionId { get; set; }
-
-        [ForeignKey("TransactionId")]
-        public virtual Transaction? Transaction { get; set; }
-
-        [Required]
         public DateTime PerformedAt { get; set; } = DateTime.UtcNow;
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-        public DateTime? UpdatedAt { get; set; }
-
-        [Required]
-        [StringLength(50)]
-        public string Status { get; set; } = "Completed";
-    }
-
-    // DTO for creating procedures
-    public class CreateProcedureDto
-    {
-        [Required]
-        public int PatientId { get; set; }
-
+        // FR5.2 - Doctor + Nurse team assignment
         public int? DoctorId { get; set; }
+        public Doctor? Doctor { get; set; }
 
         public int? NurseId { get; set; }
+        public Nurse? Nurse { get; set; }
 
+        // Patient (required)
         [Required]
-        public string ProcedureType { get; set; } = string.Empty;
+        public int PatientId { get; set; }
+        public Patient? Patient { get; set; }
 
-        public string? TreatmentNotes { get; set; }
+        // Optional Appointment link (exists in DB)
+        public int? AppointmentId { get; set; }
+        public Appointment? Appointment { get; set; }
+
+        // FR5.3 - Treatment notes, prescriptions, and reports
+        // COLUMN NAMES match actual DB: TreatmentNotes, Prescription, ReportFilePath
+        [Column("TreatmentNotes")]
+        public string? Notes { get; set; }
 
         public string? Prescription { get; set; }
 
-        [Required]
-        [Range(0, double.MaxValue)]
-        public decimal Amount { get; set; }
+        [Column("ReportFilePath")]
+        public string? ReportUrl { get; set; }
 
-        public DateTime? PerformedAt { get; set; }
-    }
+        // Transaction link (for payment tracking)
+        public int? TransactionId { get; set; }
+        public Transaction? Transaction { get; set; }
 
-    // DTO for procedure responses
-    public class ProcedureResponseDto
-    {
-        public int Id { get; set; }
-        public string ProcedureType { get; set; } = string.Empty;
-        public string PatientName { get; set; } = string.Empty;
-        public string? DoctorName { get; set; }
-        public string? NurseName { get; set; }
-        public decimal Amount { get; set; }
-        public int? InvoiceId { get; set; }
-        public bool ReportAvailable { get; set; }
-        public string PerformedAt { get; set; } = string.Empty;
-        public string? TreatmentNotes { get; set; }
-        public string? Prescription { get; set; }
-        public string Status { get; set; } = string.Empty;
-        public string? ReportFilePath { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

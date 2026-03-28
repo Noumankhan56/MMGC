@@ -22,6 +22,7 @@ const navigation = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { name: "Appointments", href: "/admin/appointments", icon: Calendar },
   { name: "Doctors", href: "/admin/doctors", icon: UserCog },
+  { name: "Nurses", href: "/admin/nurses", icon: UserCog },
   { name: "Patients", href: "/admin/patients", icon: Users },
   { name: "Procedures", href: "/admin/procedures", icon: Activity },
   { name: "Laboratory", href: "/admin/laboratory", icon: ClipboardList },

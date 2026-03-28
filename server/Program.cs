@@ -24,7 +24,8 @@ builder.Services.AddScoped<INotificationService, ConsoleNotificationService>();
 
 // Database
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+           .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 
 // CORS
 builder.Services.AddCors(options =>
@@ -53,6 +54,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseStaticFiles();
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 app.UseAuthorization();

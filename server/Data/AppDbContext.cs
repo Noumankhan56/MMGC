@@ -65,16 +65,36 @@ modelBuilder.Entity<Doctor>(entity =>
 });
 
 
-            // -------------------------
-            // NURSES
-            // -------------------------
-            modelBuilder.Entity<Nurse>(entity =>
-            {
-                entity.ToTable("Nurses");
-                entity.HasKey(n => n.Id);
-                entity.Property(n => n.Id).ValueGeneratedOnAdd();
-                entity.Property(n => n.Name).IsRequired().HasMaxLength(100);
-            });
+// -------------------------
+// NURSES (UPDATED)
+// -------------------------
+modelBuilder.Entity<Nurse>(entity =>
+{
+    entity.ToTable("Nurses");
+
+    entity.HasKey(n => n.Id);
+    entity.Property(n => n.Id).ValueGeneratedOnAdd();
+
+    entity.Property(n => n.Name)
+          .IsRequired()
+          .HasMaxLength(100);
+
+    entity.Property(n => n.Phone)
+          .HasMaxLength(20);
+
+    entity.Property(n => n.Email)
+          .HasMaxLength(150);
+
+    entity.Property(n => n.Department)
+          .HasMaxLength(100);
+
+    entity.Property(n => n.IsActive)
+          .HasDefaultValue(true);
+
+    entity.Property(n => n.CreatedAt)
+          .HasDefaultValueSql("CURRENT_TIMESTAMP");
+});
+
 
             // -------------------------
             // PATIENTS
@@ -162,34 +182,57 @@ modelBuilder.Entity<Transaction>(entity =>
           .OnDelete(DeleteBehavior.SetNull);
 });
 
-            // -------------------------
-            // PROCEDURES
-            // -------------------------
-            modelBuilder.Entity<Procedure>(entity =>
-            {
-                entity.ToTable("Procedures");
-                entity.HasKey(p => p.Id);
-                entity.Property(p => p.Id).ValueGeneratedOnAdd();
-                entity.Property(p => p.ProcedureType).IsRequired().HasMaxLength(150);
-                entity.Property(p => p.Amount).HasColumnType("numeric(12,2)");
-                entity.Property(p => p.PerformedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-                entity.Property(p => p.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+// -------------------------
+// PROCEDURES (FIXED)
+// -------------------------
+modelBuilder.Entity<Procedure>(entity =>
+{
+    entity.ToTable("Procedures");
+    entity.HasKey(p => p.Id);
 
-                entity.HasOne(p => p.Patient)
-                      .WithMany()
-                      .HasForeignKey(p => p.PatientId)
-                      .OnDelete(DeleteBehavior.Cascade);
+    entity.Property(p => p.ProcedureType).IsRequired().HasMaxLength(150);
+    entity.Property(p => p.Amount).HasColumnType("numeric");
 
-                entity.HasOne(p => p.Doctor)
-                      .WithMany()
-                      .HasForeignKey(p => p.DoctorId)
-                      .OnDelete(DeleteBehavior.SetNull);
+    entity.Property(p => p.PerformedAt)
+          .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                entity.HasOne(p => p.Transaction)
-                      .WithOne()
-                      .HasForeignKey<Procedure>(p => p.TransactionId)
-                      .OnDelete(DeleteBehavior.SetNull);
-            });
+    entity.Property(p => p.CreatedAt)
+          .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+    // Column-mapped via [Column] attribute on model:
+    // Notes → "TreatmentNotes", ReportUrl → "ReportFilePath"
+    entity.Property(p => p.Notes).HasColumnName("TreatmentNotes");
+    entity.Property(p => p.Prescription);
+    entity.Property(p => p.ReportUrl).HasColumnName("ReportFilePath");
+
+    // Relationships
+    entity.HasOne(p => p.Patient)
+          .WithMany()
+          .HasForeignKey(p => p.PatientId)
+          .OnDelete(DeleteBehavior.Cascade);
+
+    entity.HasOne(p => p.Doctor)
+          .WithMany()
+          .HasForeignKey(p => p.DoctorId)
+          .OnDelete(DeleteBehavior.SetNull);
+
+    entity.HasOne(p => p.Nurse)
+          .WithMany()
+          .HasForeignKey(p => p.NurseId)
+          .OnDelete(DeleteBehavior.SetNull);
+
+    entity.HasOne(p => p.Appointment)
+          .WithMany()
+          .HasForeignKey(p => p.AppointmentId)
+          .OnDelete(DeleteBehavior.SetNull);
+
+    entity.HasOne(p => p.Transaction)
+          .WithOne()
+          .HasForeignKey<Procedure>(p => p.TransactionId)
+          .OnDelete(DeleteBehavior.SetNull);
+});
+
+
 
             // -------------------------
             // LAB TEST TYPES
@@ -249,6 +292,28 @@ modelBuilder.Entity<Transaction>(entity =>
                       .WithMany()
                       .HasForeignKey(r => r.GeneratedByUserId)
                       .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // -------------------------
+            // INVOICES
+            // -------------------------
+            modelBuilder.Entity<Invoice>(entity =>
+            {
+                entity.ToTable("Invoices");
+                entity.HasKey(i => i.Id);
+
+                entity.Property(i => i.InvoiceNumber).IsRequired();
+                entity.Property(i => i.GeneratedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(i => i.Patient)
+                      .WithMany(p => p.Invoices)
+                      .HasForeignKey(i => i.PatientId)
+                      .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(i => i.Transaction)
+                      .WithOne(t => t.Invoice)
+                      .HasForeignKey<Invoice>(i => i.TransactionId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             // Indexes

@@ -4,6 +4,10 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace server.Data.Models
 {
+    /// <summary>
+    /// Align with actual PostgreSQL "Invoices" table schema.
+    /// </summary>
+    [Table("Invoices")]
     public class Invoice
     {
         [Key]
@@ -13,38 +17,20 @@ namespace server.Data.Models
         public int PatientId { get; set; }
 
         [ForeignKey("PatientId")]
-        public virtual Patient Patient { get; set; } = null!;
+        public virtual Patient? Patient { get; set; }
 
+        // Linked to a specific financial transaction (required in DB)
         [Required]
-        [Column(TypeName = "decimal(12,2)")]
-        public decimal Amount { get; set; }
-
-        [Required]
-        [StringLength(50)]
-        public string Status { get; set; } = "Pending";
-
-        [StringLength(500)]
-        public string? Description { get; set; }
-
-        [StringLength(50)]
-        public string? InvoiceNumber { get; set; }
-
-        [Required]
-        public DateTime IssueDate { get; set; } = DateTime.UtcNow;
-
-        [Required]
-        public DateTime DueDate { get; set; }
-
-        public DateTime? PaidDate { get; set; }
-
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-        public DateTime? UpdatedAt { get; set; }
-
-        // Navigation property for Transaction (one-to-one relationship)
-        public int? TransactionId { get; set; }
+        public int TransactionId { get; set; }
 
         [ForeignKey("TransactionId")]
         public virtual Transaction? Transaction { get; set; }
+
+        [Required]
+        public string InvoiceNumber { get; set; } = "";
+
+        public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
+
+        public string? Notes { get; set; }
     }
 }

@@ -15,6 +15,12 @@ export default defineConfig(({ mode }) => ({
         secure: false,
         rewrite: (path) => path,
       },
+      "/reports": {
+        target: "http://localhost:5193",
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path,
+      },
     },
   },
   plugins: [

@@ -2,11 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using server.Data;
 using server.Data.Models;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+using System.ComponentModel.DataAnnotations;
 
 namespace server.Controllers
 {
@@ -15,327 +11,213 @@ namespace server.Controllers
     public class ProceduresController : ControllerBase
     {
         private readonly AppDbContext _context;
-        private readonly IWebHostEnvironment _environment;
+        private readonly ILogger<ProceduresController> _logger;
 
-        public ProceduresController(AppDbContext context, IWebHostEnvironment environment)
+        public ProceduresController(AppDbContext context, ILogger<ProceduresController> logger)
         {
             _context = context;
-            _environment = environment;
+            _logger = logger;
         }
 
-        // GET: api/procedures
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ProcedureResponseDto>>> GetProcedures()
+        public async Task<IActionResult> GetAll()
         {
-            var procedures = await _context.Procedures
-                .Include(p => p.Patient)
-                .Include(p => p.Doctor)
-                .Include(p => p.Nurse)
-                .Include(p => p.Invoice)
-                .OrderByDescending(p => p.PerformedAt)
-                .Select(p => new ProcedureResponseDto
-                {
-                    Id = p.Id,
-                    ProcedureType = p.ProcedureType,
-                    PatientName = p.Patient.Name,
-                    DoctorName = p.Doctor != null ? p.Doctor.Name : null,
-                    NurseName = p.Nurse != null ? p.Nurse.Name : null,
-                    Amount = p.Amount,
-                    InvoiceId = p.InvoiceId,
-                    ReportAvailable = p.ReportAvailable,
-                    PerformedAt = p.PerformedAt.ToString("yyyy-MM-dd HH:mm"),
-                    TreatmentNotes = p.TreatmentNotes,
-                    Prescription = p.Prescription,
-                    Status = p.Status,
-                    ReportFilePath = p.ReportFilePath
-                })
-                .ToListAsync();
-
-            return Ok(procedures);
-        }
-
-        // GET: api/procedures/{id}
-        [HttpGet("{id}")]
-        public async Task<ActionResult<ProcedureResponseDto>> GetProcedure(int id)
-        {
-            var procedure = await _context.Procedures
-                .Include(p => p.Patient)
-                .Include(p => p.Doctor)
-                .Include(p => p.Nurse)
-                .Include(p => p.Invoice)
-                .Where(p => p.Id == id)
-                .Select(p => new ProcedureResponseDto
-                {
-                    Id = p.Id,
-                    ProcedureType = p.ProcedureType,
-                    PatientName = p.Patient.Name,
-                    DoctorName = p.Doctor != null ? p.Doctor.Name : null,
-                    NurseName = p.Nurse != null ? p.Nurse.Name : null,
-                    Amount = p.Amount,
-                    InvoiceId = p.InvoiceId,
-                    ReportAvailable = p.ReportAvailable,
-                    PerformedAt = p.PerformedAt.ToString("yyyy-MM-dd HH:mm"),
-                    TreatmentNotes = p.TreatmentNotes,
-                    Prescription = p.Prescription,
-                    Status = p.Status,
-                    ReportFilePath = p.ReportFilePath
-                })
-                .FirstOrDefaultAsync();
-
-            if (procedure == null)
+            try
             {
-                return NotFound(new { message = "Procedure not found" });
-            }
-
-            return Ok(procedure);
-        }
-
-        // GET: api/procedures/patient/{patientId}
-        [HttpGet("patient/{patientId}")]
-        public async Task<ActionResult<IEnumerable<ProcedureResponseDto>>> GetPatientProcedures(int patientId)
-        {
-            var procedures = await _context.Procedures
-                .Include(p => p.Patient)
-                .Include(p => p.Doctor)
-                .Include(p => p.Nurse)
-                .Where(p => p.PatientId == patientId)
-                .OrderByDescending(p => p.PerformedAt)
-                .Select(p => new ProcedureResponseDto
-                {
-                    Id = p.Id,
-                    ProcedureType = p.ProcedureType,
-                    PatientName = p.Patient.Name,
-                    DoctorName = p.Doctor != null ? p.Doctor.Name : null,
-                    NurseName = p.Nurse != null ? p.Nurse.Name : null,
-                    Amount = p.Amount,
-                    InvoiceId = p.InvoiceId,
-                    ReportAvailable = p.ReportAvailable,
-                    PerformedAt = p.PerformedAt.ToString("yyyy-MM-dd HH:mm"),
-                    TreatmentNotes = p.TreatmentNotes,
-                    Prescription = p.Prescription,
-                    Status = p.Status
-                })
-                .ToListAsync();
-
-            return Ok(procedures);
-        }
-
-        // POST: api/procedures/record
-        [HttpPost("record")]
-        public async Task<ActionResult<ProcedureResponseDto>> RecordProcedure([FromForm] CreateProcedureDto dto, IFormFile? reportFile)
-        {
-            // Validate patient exists
-            var patient = await _context.Patients.FindAsync(dto.PatientId);
-            if (patient == null)
-            {
-                return BadRequest(new { message = "Patient not found" });
-            }
-
-            // Validate doctor if provided
-            if (dto.DoctorId.HasValue)
-            {
-                var doctor = await _context.Doctors.FindAsync(dto.DoctorId.Value);
-                if (doctor == null)
-                {
-                    return BadRequest(new { message = "Doctor not found" });
-                }
-            }
-
-            // Validate nurse if provided
-            if (dto.NurseId.HasValue)
-            {
-                var nurse = await _context.Nurses.FindAsync(dto.NurseId.Value);
-                if (nurse == null)
-                {
-                    return BadRequest(new { message = "Nurse not found" });
-                }
-            }
-
-            // Create procedure
-            var procedure = new Procedure
-            {
-                PatientId = dto.PatientId,
-                DoctorId = dto.DoctorId,
-                NurseId = dto.NurseId,
-                ProcedureType = dto.ProcedureType,
-                TreatmentNotes = dto.TreatmentNotes,
-                Prescription = dto.Prescription,
-                Amount = dto.Amount,
-                PerformedAt = dto.PerformedAt ?? DateTime.UtcNow,
-                Status = "Completed"
-            };
-
-            // Handle file upload
-            if (reportFile != null && reportFile.Length > 0)
-            {
-                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "reports");
-                Directory.CreateDirectory(uploadsFolder);
-
-                var uniqueFileName = $"{Guid.NewGuid()}_{reportFile.FileName}";
-                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-                using (var fileStream = new FileStream(filePath, FileMode.Create))
-                {
-                    await reportFile.CopyToAsync(fileStream);
-                }
-
-                procedure.ReportFilePath = $"/uploads/reports/{uniqueFileName}";
-                procedure.ReportAvailable = true;
-            }
-
-            _context.Procedures.Add(procedure);
-            await _context.SaveChangesAsync();
-
-            // Auto-generate invoice
-            var invoice = new Invoice
-            {
-                PatientId = dto.PatientId,
-                Amount = dto.Amount,
-                Status = "Pending",
-                IssueDate = DateTime.UtcNow,
-                DueDate = DateTime.UtcNow.AddDays(30),
-                Description = $"Invoice for {dto.ProcedureType}",
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Invoices.Add(invoice);
-            await _context.SaveChangesAsync();
-
-            // Link invoice to procedure
-            procedure.InvoiceId = invoice.Id;
-            await _context.SaveChangesAsync();
-
-            // Return response
-            var response = new ProcedureResponseDto
-            {
-                Id = procedure.Id,
-                ProcedureType = procedure.ProcedureType,
-                PatientName = patient.Name,
-                DoctorName = dto.DoctorId.HasValue ? (await _context.Doctors.FindAsync(dto.DoctorId.Value))?.Name : null,
-                NurseName = dto.NurseId.HasValue ? (await _context.Nurses.FindAsync(dto.NurseId.Value))?.Name : null,
-                Amount = procedure.Amount,
-                InvoiceId = invoice.Id,
-                ReportAvailable = procedure.ReportAvailable,
-                PerformedAt = procedure.PerformedAt.ToString("yyyy-MM-dd HH:mm"),
-                TreatmentNotes = procedure.TreatmentNotes,
-                Prescription = procedure.Prescription,
-                Status = procedure.Status,
-                ReportFilePath = procedure.ReportFilePath
-            };
-
-            return CreatedAtAction(nameof(GetProcedure), new { id = procedure.Id }, response);
-        }
-
-        // PUT: api/procedures/{id}
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateProcedure(int id, [FromForm] CreateProcedureDto dto, IFormFile? reportFile)
-        {
-            var procedure = await _context.Procedures.FindAsync(id);
-            if (procedure == null)
-            {
-                return NotFound(new { message = "Procedure not found" });
-            }
-
-            // Validate patient
-            var patient = await _context.Patients.FindAsync(dto.PatientId);
-            if (patient == null)
-            {
-                return BadRequest(new { message = "Patient not found" });
-            }
-
-            // Update fields
-            procedure.PatientId = dto.PatientId;
-            procedure.DoctorId = dto.DoctorId;
-            procedure.NurseId = dto.NurseId;
-            procedure.ProcedureType = dto.ProcedureType;
-            procedure.TreatmentNotes = dto.TreatmentNotes;
-            procedure.Prescription = dto.Prescription;
-            procedure.Amount = dto.Amount;
-            procedure.UpdatedAt = DateTime.UtcNow;
-
-            if (dto.PerformedAt.HasValue)
-            {
-                procedure.PerformedAt = dto.PerformedAt.Value;
-            }
-
-            // Handle new file upload
-            if (reportFile != null && reportFile.Length > 0)
-            {
-                // Delete old file if exists
-                if (!string.IsNullOrEmpty(procedure.ReportFilePath))
-                {
-                    var oldFilePath = Path.Combine(_environment.WebRootPath, procedure.ReportFilePath.TrimStart('/'));
-                    if (System.IO.File.Exists(oldFilePath))
+                var list = await _context.Procedures
+                    .Include(p => p.Patient)
+                    .Include(p => p.Doctor)
+                    .Include(p => p.Nurse)
+                    .AsNoTracking()
+                    .OrderByDescending(p => p.PerformedAt)
+                    .Select(p => new
                     {
-                        System.IO.File.Delete(oldFilePath);
-                    }
-                }
+                        p.Id,
+                        p.ProcedureType,
+                        p.Amount,
+                        PerformedAt = p.PerformedAt.ToString("yyyy-MM-dd HH:mm"),
+                        Patient = new { p.Patient!.Id, p.Patient.Name, p.Patient.MRNumber },
+                        Doctor = p.Doctor != null ? new { p.Doctor.Id, p.Doctor.Name } : null,
+                        Nurse = p.Nurse != null ? new { p.Nurse.Id, p.Nurse.Name } : null,
+                        p.Notes,
+                        p.Prescription,
+                        p.ReportUrl,
+                        p.TransactionId,
+                        CreatedAt = p.CreatedAt.ToString("yyyy-MM-dd")
+                    })
+                    .ToListAsync();
 
-                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "reports");
-                Directory.CreateDirectory(uploadsFolder);
-
-                var uniqueFileName = $"{Guid.NewGuid()}_{reportFile.FileName}";
-                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-                using (var fileStream = new FileStream(filePath, FileMode.Create))
-                {
-                    await reportFile.CopyToAsync(fileStream);
-                }
-
-                procedure.ReportFilePath = $"/uploads/reports/{uniqueFileName}";
-                procedure.ReportAvailable = true;
+                return Ok(list);
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GET /api/procedures failed");
+                return StatusCode(500, $"Internal error: {ex.Message}");
+            }
+        }
 
+        [HttpGet("{id:int}")]
+        public async Task<IActionResult> Get(int id)
+        {
+            try
+            {
+                var p = await _context.Procedures
+                    .Include(p => p.Patient)
+                    .Include(p => p.Doctor)
+                    .Include(p => p.Nurse)
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == id);
+
+                if (p == null) return NotFound();
+
+                return Ok(new
+                {
+                    p.Id,
+                    p.ProcedureType,
+                    p.Amount,
+                    PerformedAt = p.PerformedAt.ToString("yyyy-MM-dd HH:mm"),
+                    Patient = new { p.Patient!.Id, p.Patient.Name, p.Patient.MRNumber },
+                    Doctor = p.Doctor != null ? new { p.Doctor.Id, p.Doctor.Name } : null,
+                    Nurse = p.Nurse != null ? new { p.Nurse.Id, p.Nurse.Name } : null,
+                    p.Notes,
+                    p.Prescription,
+                    p.ReportUrl,
+                    p.TransactionId,
+                    CreatedAt = p.CreatedAt.ToString("yyyy-MM-dd")
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] ProcedureCreateDto dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // 1. Create Procedure
+                var procedure = new Procedure
+                {
+                    ProcedureType = dto.ProcedureType,
+                    Amount = dto.Amount,
+                    PatientId = dto.PatientId,
+                    DoctorId = (dto.DoctorId > 0) ? dto.DoctorId : null,
+                    NurseId = (dto.NurseId > 0) ? dto.NurseId : null,
+                    PerformedAt = dto.PerformedAt.HasValue 
+                        ? DateTime.SpecifyKind(dto.PerformedAt.Value, DateTimeKind.Utc) 
+                        : DateTime.UtcNow,
+                    Notes = dto.Notes,
+                    Prescription = dto.Prescription,
+                    ReportUrl = dto.ReportUrl,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.Procedures.Add(procedure);
+                await _context.SaveChangesAsync();
+
+                // 2. FR5.4 - Create Transaction
+                var financeTransaction = new Transaction
+                {
+                    Type = TransactionType.Procedure,
+                    Amount = dto.Amount,
+                    PatientId = dto.PatientId,
+                    ProcedureId = procedure.Id,
+                    PaymentMethod = "Cash", // Default
+                    PaidAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.Transactions.Add(financeTransaction);
+                await _context.SaveChangesAsync();
+
+                // 3. FR5.4 - Create Invoice (linked to Transaction)
+                var invoice = new Invoice
+                {
+                    PatientId = dto.PatientId,
+                    TransactionId = financeTransaction.Id,
+                    InvoiceNumber = $"INV-PROC-{procedure.Id:D5}",
+                    GeneratedAt = DateTime.UtcNow,
+                    Notes = $"Invoice for {dto.ProcedureType}"
+                };
+
+                _context.Invoices.Add(invoice);
+                await _context.SaveChangesAsync();
+
+                // 4. Update Procedure with TransactionId (for convenience)
+                procedure.TransactionId = financeTransaction.Id;
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+
+                return CreatedAtAction(nameof(Get), new { id = procedure.Id }, new { id = procedure.Id, message = "Saved with Transaction and Invoice" });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Save failed");
+                return StatusCode(500, $"Failed to save: {ex.InnerException?.Message ?? ex.Message}");
+            }
+        }
+
+        [HttpPut("{id:int}")]
+        public async Task<IActionResult> Update(int id, [FromBody] ProcedureCreateDto dto)
+        {
+            var p = await _context.Procedures.FindAsync(id);
+            if (p == null) return NotFound();
+
+            try
+            {
+                p.ProcedureType = dto.ProcedureType;
+                p.Amount = dto.Amount;
+                p.PatientId = dto.PatientId;
+                p.DoctorId = (dto.DoctorId > 0) ? dto.DoctorId : null;
+                p.NurseId = (dto.NurseId > 0) ? dto.NurseId : null;
+                p.PerformedAt = dto.PerformedAt.HasValue 
+                    ? DateTime.SpecifyKind(dto.PerformedAt.Value, DateTimeKind.Utc) 
+                    : p.PerformedAt;
+                p.Notes = dto.Notes;
+                p.Prescription = dto.Prescription;
+                p.ReportUrl = dto.ReportUrl;
+
+                await _context.SaveChangesAsync();
+                return Ok(new { message = "Updated successfully" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [HttpDelete("{id:int}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var p = await _context.Procedures.FindAsync(id);
+            if (p == null) return NotFound();
+
+            _context.Procedures.Remove(p);
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(new { message = "Deleted" });
         }
+    }
 
-        // DELETE: api/procedures/{id}
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteProcedure(int id)
-        {
-            var procedure = await _context.Procedures.FindAsync(id);
-            if (procedure == null)
-            {
-                return NotFound(new { message = "Procedure not found" });
-            }
-
-            // Delete associated file if exists
-            if (!string.IsNullOrEmpty(procedure.ReportFilePath))
-            {
-                var filePath = Path.Combine(_environment.WebRootPath, procedure.ReportFilePath.TrimStart('/'));
-                if (System.IO.File.Exists(filePath))
-                {
-                    System.IO.File.Delete(filePath);
-                }
-            }
-
-            _context.Procedures.Remove(procedure);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        // GET: api/procedures/stats
-        [HttpGet("stats")]
-        public async Task<ActionResult> GetProcedureStats()
-        {
-            var now = DateTime.UtcNow;
-            var startOfMonth = new DateTime(now.Year, now.Month, 1);
-
-            var totalProcedures = await _context.Procedures.CountAsync();
-            var thisMonth = await _context.Procedures.CountAsync(p => p.PerformedAt >= startOfMonth);
-            var totalRevenue = await _context.Procedures.SumAsync(p => (decimal?)p.Amount) ?? 0;
-            var reportsUploaded = await _context.Procedures.CountAsync(p => p.ReportAvailable);
-
-            return Ok(new
-            {
-                totalProcedures,
-                thisMonth,
-                totalRevenue,
-                reportsUploaded
-            });
-        }
+    public class ProcedureCreateDto
+    {
+        [Required]
+        public string ProcedureType { get; set; } = "";
+        public decimal Amount { get; set; }
+        [Required]
+        public int PatientId { get; set; }
+        public int? DoctorId { get; set; }
+        public int? NurseId { get; set; }
+        public DateTime? PerformedAt { get; set; }
+        public string? Notes { get; set; }
+        public string? Prescription { get; set; }
+        public string? ReportUrl { get; set; }
     }
 }

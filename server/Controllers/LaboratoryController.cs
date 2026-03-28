@@ -10,104 +10,169 @@ namespace server.Controllers
     public class LaboratoryController : ControllerBase
     {
         private readonly AppDbContext _context;
-        public LaboratoryController(AppDbContext context) => _context = context;
+        private readonly ILogger<LaboratoryController> _logger;
+
+        public LaboratoryController(AppDbContext context, ILogger<LaboratoryController> logger)
+        {
+            _context = context;
+            _logger = logger;
+        }
 
         // GET: api/laboratory
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var tests = await _context.LabTests
-                .Include(t => t.Patient)
+            try
+            {
+                var tests = await _context.LabTests
+                    .Include(t => t.Patient)
+                    .Include(t => t.TestType)
+                    .Include(t => t.AssignedToStaff)
+                    .AsNoTracking()
+                    .OrderByDescending(t => t.OrderedAt)
+                    .Select(t => new
+                    {
+                        t.Id,
+                        PatientId = t.PatientId,
+                        PatientName = t.Patient != null ? t.Patient.Name : "Unknown",
+                        PatientMRN = t.Patient != null ? t.Patient.MRNumber : "N/A",
+                        TestName = t.TestType != null ? t.TestType.Name : "N/A",
+                        Category = t.TestType != null ? t.TestType.Category : "N/A",
+                        OrderedAt = t.OrderedAt.ToString("yyyy-MM-dd HH:mm"),
+                        SampleCollectedAt = t.SampleCollectedAt.HasValue ? t.SampleCollectedAt.Value.ToString("yyyy-MM-dd HH:mm") : null,
+                        ReportedAt = t.ReportedAt.HasValue ? t.ReportedAt.Value.ToString("yyyy-MM-dd HH:mm") : null,
+                        StaffName = t.AssignedToStaff != null ? t.AssignedToStaff.Name : "Not Assigned",
+                        t.IsUrgent,
+                        t.IsCompleted,
+                        t.ReportFilePath,
+                        t.DoctorNotes,
+                        t.ReportFindings
+                    })
+                    .ToListAsync();
+
+                return Ok(tests);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GET /api/laboratory failed");
+                return StatusCode(500, $"Internal error: {ex.Message}");
+            }
+        }
+
+        // GET: api/laboratory/patient/{patientId} (FR6.4 - linked to medical history)
+        [HttpGet("patient/{patientId:int}")]
+        public async Task<IActionResult> GetByPatient(int patientId)
+        {
+            var history = await _context.LabTests
+                .Where(t => t.PatientId == patientId)
                 .Include(t => t.TestType)
-                .Include(t => t.AssignedToStaff)
+                .OrderByDescending(t => t.OrderedAt)
                 .Select(t => new
                 {
                     t.Id,
-                    PatientId = t.PatientId,
-                    PatientName = t.Patient != null ? t.Patient.Name : "Unknown",
                     TestName = t.TestType != null ? t.TestType.Name : "N/A",
                     Category = t.TestType != null ? t.TestType.Category : "N/A",
-                    t.OrderedAt,
-                    t.SampleCollectedAt,
-                    t.ReportedAt,
-                    StaffName = t.AssignedToStaff != null ? t.AssignedToStaff.Name : "Not Assigned",
-                    t.IsUrgent,
+                    OrderedAt = t.OrderedAt.ToString("yyyy-MM-dd"),
                     t.IsCompleted,
                     t.ReportFilePath,
-                    t.DoctorNotes,
                     t.ReportFindings
                 })
-                .OrderByDescending(t => t.OrderedAt)
                 .ToListAsync();
 
-            return Ok(tests);
+            return Ok(history);
         }
 
-        // GET: api/laboratory/types
+        // GET: api/laboratory/types (FR6.1 - categorization)
         [HttpGet("types")]
         public async Task<IActionResult> GetTestTypes()
             => Ok(await _context.LabTestTypes
                 .Where(t => t.IsActive)
                 .OrderBy(t => t.Category)
                 .ThenBy(t => t.Name)
-                .Select(t => new
-                {
-                    t.Id,
-                    t.Name,
-                    t.Category,
-                    t.DefaultPrice
-                })
+                .Select(t => new { t.Id, t.Name, t.Category, t.DefaultPrice })
                 .ToListAsync());
 
-        // POST: api/laboratory
+        // POST: api/laboratory (FR6.2 - book test sample)
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateLabTestDto dto)
         {
+            _logger.LogInformation("Creating lab test: {@Dto}", dto);
+
             if (!await _context.Patients.AnyAsync(p => p.Id == dto.PatientId))
                 return BadRequest("Patient not found.");
 
             if (!await _context.LabTestTypes.AnyAsync(t => t.Id == dto.LabTestTypeId))
                 return BadRequest("Test type not found.");
 
-            var labTest = new LabTest
+            try
             {
-                PatientId = dto.PatientId,
-                LabTestTypeId = dto.LabTestTypeId,
-                AssignedToStaffId = dto.AssignedToStaffId,
-                DoctorNotes = dto.DoctorNotes?.Trim(),
-                IsUrgent = dto.IsUrgent,
-                OrderedAt = DateTime.UtcNow
-            };
+                var labTest = new LabTest
+                {
+                    PatientId = dto.PatientId,
+                    LabTestTypeId = dto.LabTestTypeId,
+                    AssignedToStaffId = (dto.AssignedToStaffId > 0) ? dto.AssignedToStaffId : null,
+                    DoctorNotes = dto.DoctorNotes?.Trim(),
+                    IsUrgent = dto.IsUrgent,
+                    OrderedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
+                };
 
-            _context.LabTests.Add(labTest);
-            await _context.SaveChangesAsync();
+                _context.LabTests.Add(labTest);
+                await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetAll), new { id = labTest.Id }, new
+                return CreatedAtAction(nameof(GetAll), new { id = labTest.Id }, new { labTest.Id, Message = "Lab test ordered successfully" });
+            }
+            catch (Exception ex)
             {
-                labTest.Id,
-                Message = "Lab test ordered successfully"
-            });
+                _logger.LogError(ex, "Failed to create lab test");
+                return StatusCode(500, $"Internal error: {ex.Message}");
+            }
         }
 
-        // PUT: api/laboratory/{id}/upload-report
+        // PUT: api/laboratory/{id}/collect-sample (FR6.2)
+        [HttpPut("{id:int}/collect-sample")]
+        public async Task<IActionResult> CollectSample(int id)
+        {
+            var test = await _context.LabTests.FindAsync(id);
+            if (test == null) return NotFound();
+
+            test.SampleCollectedAt = DateTime.UtcNow;
+            test.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { Message = "Sample marked as collected", SampleCollectedAt = test.SampleCollectedAt });
+        }
+
+        // PUT: api/laboratory/{id}/upload-report (FR6.3)
         [HttpPut("{id:int}/upload-report")]
         public async Task<IActionResult> UploadReport(int id, [FromBody] UploadReportDto dto)
         {
             var test = await _context.LabTests.FindAsync(id);
             if (test == null) return NotFound();
 
-            test.ReportFilePath = dto.ReportFilePath;
+            test.ReportFilePath = dto.ReportFilePath?.Trim();
             test.ReportFindings = dto.ReportFindings?.Trim();
             test.ReportedAt = DateTime.UtcNow;
             test.IsCompleted = true;
             test.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            return Ok(new { Message = "Report uploaded successfully" });
+            return Ok(new { Message = "Report saved and test completed" });
+        }
+
+        // DELETE: api/laboratory/{id}
+        [HttpDelete("{id:int}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var test = await _context.LabTests.FindAsync(id);
+            if (test == null) return NotFound();
+
+            _context.LabTests.Remove(test);
+            await _context.SaveChangesAsync();
+            return Ok(new { Message = "Deleted" });
         }
     }
 
-    // DTOs
     public class CreateLabTestDto
     {
         public int PatientId { get; set; }
@@ -119,7 +184,7 @@ namespace server.Controllers
 
     public class UploadReportDto
     {
-        public string ReportFilePath { get; set; } = null!;
+        public string? ReportFilePath { get; set; }
         public string? ReportFindings { get; set; }
     }
 }
