@@ -53,6 +53,10 @@ namespace server.Data.Models
         public int? TransactionId { get; set; }
         public Transaction? Transaction { get; set; }
 
+        // FR18.4 - Status tracking for patient requests
+        [MaxLength(50)]
+        public string Status { get; set; } = "Performed";
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

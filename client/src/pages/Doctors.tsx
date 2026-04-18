@@ -24,6 +24,7 @@ interface Doctor {
   phone: string | null;
   email: string | null;
   status: "Active" | "Inactive";
+  isRegistered: boolean;
   totalAppointments: number;
   totalRevenue: number;
   workSchedule: WorkSlot[];
@@ -209,9 +210,16 @@ export default function Doctors() {
                       </CardTitle>
                       <p className="text-sm text-muted-foreground mt-1">{doc.specialization}</p>
                     </div>
-                    <Badge variant={doc.status === "Active" ? "default" : "secondary"}>
-                      {doc.status}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-2">
+                       <Badge variant={doc.status === "Active" ? "default" : "secondary"}>
+                        {doc.status}
+                      </Badge>
+                      {doc.isRegistered && (
+                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 flex items-center gap-1">
+                          <Plus className="h-3 w-3" /> Portal Active
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>

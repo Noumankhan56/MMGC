@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "../components/ui/card";
+import { useEffect, useState } from "react";
 
 const mainServices = [
   {
@@ -109,6 +110,24 @@ const processSteps = [
 ];
 
 const ServicesPage = () => {
+  const [services, setServices] = useState(mainServices);
+  const [extraServices, setExtraServices] = useState(additionalServices);
+
+  useEffect(() => {
+    fetch("/api/doctors")
+      .then(res => res.json())
+      .then(data => {
+        // Derive unique specializations
+        const specs = Array.from(new Set(data.map((d: any) => d.specialization)))
+          .filter(Boolean) as string[];
+        
+        if (specs.length > 0) {
+           // We could potentially update the 'additionalServices' or 'mainServices' here
+           // For now, let's just make sure we are aware of them.
+        }
+      });
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />

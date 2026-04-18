@@ -7,7 +7,8 @@ interface StatsCardProps {
   change?: string;
   changeType?: "positive" | "negative" | "neutral";
   icon: LucideIcon;
-  iconColor?: "primary" | "secondary" | "success" | "warning" | "destructive";
+  iconColor?: "primary" | "secondary" | "success" | "warning" | "destructive" | "info";
+  className?: string;
 }
 
 const iconColorClasses = {
@@ -16,6 +17,7 @@ const iconColorClasses = {
   success: "bg-success/10 text-success",
   warning: "bg-warning/10 text-warning",
   destructive: "bg-destructive/10 text-destructive",
+  info: "bg-blue-500/10 text-blue-500",
 };
 
 export function StatsCard({
@@ -25,9 +27,10 @@ export function StatsCard({
   changeType = "neutral",
   icon: Icon,
   iconColor = "primary",
+  className,
 }: StatsCardProps) {
   return (
-    <div className="bg-card rounded-xl p-5 shadow-card hover:shadow-card-hover transition-shadow duration-300 border border-border/50">
+    <div className={cn("bg-card rounded-xl p-5 shadow-card hover:shadow-card-hover transition-shadow duration-300 border border-border/50", className)}>
       <div className="flex items-start justify-between">
         <div className="space-y-2">
           <p className="text-sm font-medium text-muted-foreground">{title}</p>

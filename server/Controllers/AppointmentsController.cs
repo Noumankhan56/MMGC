@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using server.Data;
 using server.Data.Models;
+using server.Services;
 
 namespace server.Controllers
 {
@@ -11,22 +12,41 @@ namespace server.Controllers
     {
         private readonly AppDbContext _context;
         private readonly ILogger<AppointmentsController> _logger;
+        private readonly AlertService _alertService;
 
-        public AppointmentsController(AppDbContext context, ILogger<AppointmentsController> logger)
+        public AppointmentsController(AppDbContext context, ILogger<AppointmentsController> logger, AlertService alertService)
         {
             _context = context;
             _logger = logger;
+            _alertService = alertService;
         }
 
         // ------------------------------------------
         // GET ALL
         // ------------------------------------------
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] int? doctorId, [FromQuery] string? date)
         {
-            var list = await _context.Appointments
+            var query = _context.Appointments
                 .Include(a => a.Patient)
                 .Include(a => a.Doctor)
+                .AsNoTracking();
+
+            if (doctorId.HasValue)
+            {
+                query = query.Where(a => a.DoctorId == doctorId.Value);
+            }
+
+            if (!string.IsNullOrEmpty(date))
+            {
+                if (DateTime.TryParse(date, out var targetDate))
+                {
+                    var d = targetDate.Date;
+                    query = query.Where(a => a.Date == d);
+                }
+            }
+
+            var list = await query
                 .OrderByDescending(a => a.Date)
                 .ThenBy(a => a.Time)
                 .Select(a => new
@@ -107,6 +127,15 @@ namespace server.Controllers
 
             _context.Appointments.Add(appointment);
             await _context.SaveChangesAsync();
+
+            // Trigger Automated Notification
+            var doctor = await _context.Doctors.FindAsync(appointment.DoctorId);
+            await _alertService.NotifyPatientAsync(
+                appointment.PatientId,
+                "Appointment Confirmed",
+                $"Your appointment with {doctor?.Name ?? "Specialist"} is confirmed for {appointment.Date:yyyy-MM-dd} at {appointment.Time}.",
+                "Appointment"
+            );
 
             return CreatedAtAction(nameof(Get), new { id = appointment.Id }, new { message = "Appointment created", id = appointment.Id });
         }

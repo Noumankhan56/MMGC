@@ -1,0 +1,27 @@
+# Visual Studio / .NET
+[B|b]in/
+[O|o]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+server/bin/
+server/obj/
+
+# Node / React
+node_modules/
+dist/
+client/dist/
+build/
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# Mac
+.DS_Store
+
+# User generated uploads (optional, but good practice in Git)
+server/wwwroot/uploads/

@@ -22,6 +22,7 @@ interface Patient {
   email: string;
   gender: string;
   dateOfBirth: string;
+  isRegistered: boolean;
   age: number;
   totalVisits: number;
   totalSpent: number;
@@ -129,7 +130,14 @@ export default function Patients() {
                     <CardTitle className="text-xl">{p.name}</CardTitle>
                     <p className="text-sm text-muted-foreground">{p.mrNumber}</p>
                   </div>
-                  <Badge>{p.gender}</Badge>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge>{p.gender}</Badge>
+                    {p.isRegistered && (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                        Registered
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -147,7 +155,22 @@ export default function Patients() {
                     <Edit className="h-4 w-4" />
                   </Button>
                   <Button size="sm" variant="outline" className="text-destructive"
-                    onClick={e => { e.stopPropagation(); /* Delete logic */ }}>
+                    onClick={e => { 
+                      e.stopPropagation(); 
+                      if (confirm(`Are you sure you want to delete ${p.name}?`)) {
+                        fetch(`${API}/${p.id}`, { method: "DELETE" })
+                          .then(async res => {
+                            if (res.ok) {
+                              toast.success("Patient deleted");
+                              fetchPatients();
+                            } else {
+                              const err = await res.text();
+                              toast.error(err || "Failed to delete");
+                            }
+                          })
+                          .catch(() => toast.error("Network error"));
+                      }
+                    }}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>

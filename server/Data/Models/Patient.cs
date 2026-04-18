@@ -27,6 +27,24 @@ namespace server.Data.Models
         [MaxLength(10)]
         public string Gender { get; set; } = "Male"; // Male, Female, Other
 
+        [MaxLength(500)]
+        public string? Address { get; set; }
+
+        [MaxLength(10)]
+        public string? BloodGroup { get; set; }  // A+, B-, O+, AB+, etc.
+
+        [MaxLength(100)]
+        public string? EmergencyContactName { get; set; }
+
+        [MaxLength(20)]
+        public string? EmergencyContactPhone { get; set; }
+
+        public string? ProfilePictureUrl { get; set; }
+
+        public int? UserId { get; set; }
+        [ForeignKey("UserId")]
+        public virtual User? UserAccount { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation

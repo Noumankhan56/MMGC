@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using server.Data;
 using server.Data.Models;
+using server.Services;
 
 namespace server.Controllers
 {
@@ -11,11 +12,13 @@ namespace server.Controllers
     {
         private readonly AppDbContext _context;
         private readonly ILogger<LaboratoryController> _logger;
+        private readonly AlertService _alertService;
 
-        public LaboratoryController(AppDbContext context, ILogger<LaboratoryController> logger)
+        public LaboratoryController(AppDbContext context, ILogger<LaboratoryController> logger, AlertService alertService)
         {
             _context = context;
             _logger = logger;
+            _alertService = alertService;
         }
 
         // GET: api/laboratory
@@ -157,6 +160,15 @@ namespace server.Controllers
             test.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            // Trigger Automated Notification
+            await _alertService.NotifyPatientAsync(
+                test.PatientId,
+                "Lab Report Ready",
+                $"Your diagnostic report for {test.TestType?.Name ?? "Laboratory Test"} is now available in your medical vault.",
+                "Report"
+            );
+
             return Ok(new { Message = "Report saved and test completed" });
         }
 
@@ -170,6 +182,47 @@ namespace server.Controllers
             _context.LabTests.Remove(test);
             await _context.SaveChangesAsync();
             return Ok(new { Message = "Deleted" });
+        }
+
+        // -------------------------
+        // HELPERS (Dashboard support)
+        // -------------------------
+        [HttpGet("pending-samples")]
+        public async Task<IActionResult> GetPendingSamples()
+        {
+            var pending = await _context.LabTests
+                .Include(l => l.Patient)
+                .Include(l => l.TestType)
+                .Where(l => l.SampleCollectedAt == null)
+                .OrderBy(l => l.OrderedAt)
+                .Select(l => new {
+                    l.Id,
+                    PatientName = l.Patient!.Name,
+                    PatientMRN = l.Patient.MRNumber,
+                    TestName = l.TestType!.Name,
+                    OrderedAt = l.OrderedAt.ToString("yyyy-MM-dd HH:mm"),
+                    l.IsUrgent
+                })
+                .ToListAsync();
+            return Ok(pending);
+        }
+
+        [HttpGet("completed-reports")]
+        public async Task<IActionResult> GetCompletedReports()
+        {
+            var completed = await _context.LabTests
+                .Include(l => l.Patient)
+                .Include(l => l.TestType)
+                .Where(l => l.IsCompleted)
+                .OrderByDescending(l => l.ReportedAt)
+                .Select(l => new {
+                    l.Id,
+                    PatientName = l.Patient!.Name,
+                    TestName = l.TestType!.Name,
+                    ReportedAt = l.ReportedAt.HasValue ? l.ReportedAt.Value.ToString("yyyy-MM-dd HH:mm") : "N/A"
+                })
+                .ToListAsync();
+            return Ok(completed);
         }
     }
 

@@ -21,8 +21,9 @@ import {
 import { Link } from "react-router-dom";
 import Navbar from "@/Patient/components/Navbar";
 import Footer from "@/Patient/components/Footer";
+import { useEffect, useState } from "react";
 
-const services = [
+const initialServices = [
   {
     icon: Stethoscope,
     title: "General Consultation",
@@ -108,6 +109,56 @@ const stats = [
 ];
 
 const Index = () => {
+  const [stats, setStats] = useState([
+    { value: "0", label: "Patients Served" },
+    { value: "0", label: "Expert Doctors" },
+    { value: "0", label: "Patient Satisfaction" },
+    { value: "24/7", label: "Emergency Care" },
+  ]);
+  const [featuredDoctors, setFeaturedDoctors] = useState<any[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch Public Stats
+    fetch("/api/public/stats")
+      .then(res => res.json())
+      .then(data => {
+        // Handle both camelCase and PascalCase
+        const patients = data.patientsServed || data.PatientsServed;
+        const doctors = data.expertDoctors || data.ExpertDoctors;
+        const rate = data.successRate || data.SuccessRate || "98%";
+
+        setStats([
+          { value: patients?.toLocaleString() || "15K+", label: "Patients Served" },
+          { value: doctors?.toString() || "50+", label: "Expert Doctors" },
+          { value: rate, label: "Patient Satisfaction" },
+          { value: "24/7", label: "Emergency Care" },
+        ]);
+        setStatsLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error fetching stats:", err);
+        // Fallback to defaults
+        setStats([
+          { value: "15K+", label: "Patients Served" },
+          { value: "50+", label: "Expert Doctors" },
+          { value: "98%", label: "Patient Satisfaction" },
+          { value: "24/7", label: "Emergency Care" },
+        ]);
+        setStatsLoading(false);
+      });
+
+    // Fetch Featured Doctors (Top 3)
+    fetch("/api/doctors")
+      .then(res => res.json())
+      .then(data => {
+        setFeaturedDoctors(data.slice(0, 3));
+      })
+      .catch(err => console.error("Error fetching featured doctors:", err));
+  }, []);
+
+  const services = initialServices;
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -343,40 +394,57 @@ const Index = () => {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            {doctors.map((doc) => (
+            {featuredDoctors.length > 0 ? featuredDoctors.map((doc) => (
               <div
-                key={doc.name}
-                className="bg-card p-6 rounded-xl border shadow hover:shadow-lg transition"
+                key={doc.id}
+                className="bg-card p-6 rounded-xl border shadow hover:shadow-lg transition flex flex-col items-center text-center"
               >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
-                    <Users className="text-white h-6 w-6" />
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold">{doc.name}</h3>
-                    <p className="text-primary text-sm">{doc.specialty}</p>
-                  </div>
+                <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center mb-4 overflow-hidden border-4 border-primary/20 relative group">
+                  {doc.profilePictureUrl ? (
+                    <img 
+                      src={doc.profilePictureUrl} 
+                      alt={doc.name} 
+                      className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "";
+                        (e.target as HTMLImageElement).className = "hidden";
+                      }}
+                    />
+                  ) : (
+                    <Users className="text-white h-10 w-10" />
+                  )}
+                  {!doc.profilePictureUrl && <Users className="text-white h-10 w-10 absolute" />}
                 </div>
 
-                <p className="text-sm flex gap-2 mb-1">
-                  <Hospital className="h-4 w-4" /> {doc.hospital}
+                <h3 className="font-semibold text-lg">{doc.name}</h3>
+                <p className="text-primary font-medium text-sm mb-3">
+                  {doc.specialization}
                 </p>
 
-                <p className="text-sm flex gap-2 mb-1">
-                  <Clock className="h-4 w-4" /> {doc.timing}
-                </p>
+                <div className="space-y-2 mb-4 w-full">
+                  <p className="text-sm flex items-center justify-center gap-2">
+                    <Hospital className="h-4 w-4 text-muted-foreground" /> {doc.clinicName || "MMGC Specialist Center"}
+                  </p>
+                  <p className="text-sm flex items-center justify-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" /> {doc.clinicTimings || "Mon-Fri: 9AM - 5PM"}
+                  </p>
+                </div>
 
-                <p className="text-sm mb-1">Experience: {doc.exp}</p>
-
-                <div className="flex items-center gap-1 mb-3">
+                <div className="flex items-center gap-1 mb-5">
                   <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                  <span className="text-sm">{doc.rating}</span>
+                  <span className="text-sm font-bold">4.9</span>
+                  <span className="text-xs text-muted-foreground font-medium ml-1">(120+ Reviews)</span>
                 </div>
 
-                <Button size="sm">Book Appointment</Button>
+                <Button size="sm" className="w-full mt-auto" asChild>
+                  <Link to="/dashboard/appointments">Book Appointment</Link>
+                </Button>
               </div>
-            ))}
+            )) : (
+              <div className="col-span-full py-10 text-center animate-pulse text-muted-foreground font-bold uppercase tracking-widest">
+                Loading Specialist Profiles...
+              </div>
+            )}
           </div>
         </div>
       </section>

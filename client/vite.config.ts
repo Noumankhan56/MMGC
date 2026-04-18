@@ -21,6 +21,12 @@ export default defineConfig(({ mode }) => ({
         secure: false,
         rewrite: (path) => path,
       },
+      "/uploads": {
+        target: "http://localhost:5193",
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path,
+      },
     },
   },
   plugins: [

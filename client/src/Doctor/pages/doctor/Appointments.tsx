@@ -6,6 +6,8 @@ import {
   MoreVertical,
   Check,
   X,
+  Search,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/Doctor/components/ui/button";
 import { Badge } from "@/Doctor/components/ui/badge";
@@ -17,8 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/Doctor/components/ui/select";
+import { useAuth } from "@/Auth/AuthContext";
 import { cn } from "@/Doctor/lib/utils";
 import { toast } from "sonner";
+import { AppointmentFormModal } from "@/Doctor/components/doctor/AppointmentFormModal";
 
 type AppointmentStatus =
   | "Scheduled"
@@ -27,36 +31,14 @@ type AppointmentStatus =
   | "Completed"
   | "Canceled";
 
-interface ApiAppointment {
-  id: number;
-  doctorId: number;
-  patientId: number;
-  date: string;
-  time: string;
-  status: AppointmentStatus;
-  amount: number;
-  patient: {
-    id: number;
-    name: string;
-    phone: string;
-  };
-  doctor: {
-    id: number;
-    name: string;
-  };
-}
-
 interface Appointment {
   id: number;
-  patientId: number;
-  doctorId: number;       // ✅ Added doctorId
   patientName: string;
   phone: string;
   date: string;
   time: string;
   status: AppointmentStatus;
   amount: number;
-  doctorName: string;
 }
 
 const statusConfig: Record<AppointmentStatus, { label: string; className: string }> = {
@@ -68,42 +50,44 @@ const statusConfig: Record<AppointmentStatus, { label: string; className: string
 };
 
 export default function Appointments() {
-  const doctorName = "Sarah Williams"; // 🔴 filter for this doctor
+  const { user } = useAuth();
+  const doctorProfileId = user?.doctorProfileId;
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [doctorName, setDoctorName] = useState(user?.name || "Doctor");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  /* ================= FETCH ================= */
 
   useEffect(() => {
-    fetchAppointments();
-  }, []);
+    if (doctorProfileId) {
+      fetchAppointments();
+      fetchDoctorInfo();
+    }
+  }, [doctorProfileId]);
+
+
+  const fetchDoctorInfo = async () => {
+    try {
+      const res = await fetch(`/api/doctors/${doctorProfileId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDoctorName(data.name);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchAppointments = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/appointments");
+      const res = await fetch(`/api/doctor/appointments/${doctorProfileId}`);
       if (!res.ok) throw new Error("Failed to fetch appointments");
 
-      const data: ApiAppointment[] = await res.json();
-
-      const mapped: Appointment[] = data
-        .filter((a) => a.doctor?.name === doctorName)
-        .map((a) => ({
-          id: a.id,
-          patientId: a.patientId,
-          doctorId: a.doctorId,        // ✅ keep doctorId
-          patientName: a.patient?.name || "N/A",
-          phone: a.patient?.phone || "N/A",
-          date: a.date,
-          time: a.time,
-          status: a.status,
-          amount: a.amount,
-          doctorName: a.doctor?.name || "N/A",
-        }));
-
-      setAppointments(mapped);
+      const data = await res.json();
+      setAppointments(data);
     } catch {
       toast.error("Failed to load appointments");
     } finally {
@@ -111,35 +95,19 @@ export default function Appointments() {
     }
   };
 
-  /* ================= STATUS UPDATE ================= */
-
   const updateStatus = async (id: number, status: AppointmentStatus) => {
     try {
-      const appointment = appointments.find((a) => a.id === id);
-      if (!appointment) throw new Error("Appointment not found");
-
-      const res = await fetch(`/api/appointments/${id}`, {
+      const res = await fetch(`/api/doctor/appointments/${id}/status?status=${status}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          patientId: appointment.patientId,
-          doctorId: appointment.doctorId, // ✅ send number
-          date: appointment.date,
-          time: appointment.time,
-          amount: appointment.amount,
-          status,
-        }),
       });
 
       if (!res.ok) throw new Error();
-      toast.success("Status updated successfully");
+      toast.success(`Appointment marked as ${status}`);
       fetchAppointments();
     } catch {
       toast.error("Failed to update status");
     }
   };
-
-  /* ================= FILTER ================= */
 
   const filteredAppointments = appointments.filter((a) => {
     if (filter !== "all" && a.status !== filter) return false;
@@ -151,107 +119,175 @@ export default function Appointments() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Appointments for {doctorName}</h1>
-
-        {/* Filters */}
-        <div className="flex gap-4">
-          <Input
-            placeholder="Search patients..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-
-          <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="Scheduled">Scheduled</SelectItem>
-              <SelectItem value="Confirmed">Confirmed</SelectItem>
-              <SelectItem value="In-Progress">In Progress</SelectItem>
-              <SelectItem value="Completed">Completed</SelectItem>
-              <SelectItem value="Canceled">Canceled</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button variant="outline" size="icon">
-            <Filter className="h-4 w-4" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
+              Appointments for Dr. {doctorName}
+            </h1>
+            <p className="text-muted-foreground group flex items-center gap-1">
+              All appointments
+              <Badge variant="outline" className="ml-2 font-normal"></Badge>
+            </p>
+          </div>
+          <Button 
+            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 gap-2"
+            onClick={() => setIsModalOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            New Appointment
           </Button>
         </div>
 
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-4 bg-card/60 backdrop-blur-md p-4 rounded-2xl border border-border/50 shadow-sm">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by patient name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10 h-10 bg-background/50 border-0 shadow-inner"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <Select value={filter} onValueChange={setFilter}>
+              <SelectTrigger className="w-[180px] h-10 bg-background/50 border-0">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Appointments</SelectItem>
+                <SelectItem value="Scheduled">Scheduled</SelectItem>
+                <SelectItem value="Confirmed">Confirmed</SelectItem>
+                <SelectItem value="In-Progress">In Progress</SelectItem>
+                <SelectItem value="Completed">Completed</SelectItem>
+                <SelectItem value="Canceled">Canceled</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button variant="ghost" size="icon" className="h-10 w-10">
+              <Filter className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
         {/* Appointment Table */}
-        <div className="rounded-lg border overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="p-2 text-left">Patient</th>
-                <th className="p-2 text-left">Doctor</th>
-                <th className="p-2">Date</th>
-                <th className="p-2">Time</th>
-                <th className="p-2">Fee</th>
-                <th className="p-2">Status</th>
-                <th className="p-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
+        <div className="bg-card rounded-2xl border border-border/50 shadow-md overflow-hidden transition-all duration-300">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-muted/30 text-muted-foreground font-medium uppercase tracking-wider text-xs border-b border-border">
                 <tr>
-                  <td colSpan={7} className="p-4 text-center">Loading...</td>
+                  <th className="p-5">Patient Details</th>
+                  <th className="p-5">Schedule</th>
+                  <th className="p-5">Fee / Amount</th>
+                  <th className="p-5">Status</th>
+                  <th className="p-5 text-center">Actions</th>
                 </tr>
-              )}
+              </thead>
+              <tbody className="divide-y divide-border">
+                {loading && (
+                  <tr>
+                    <td colSpan={5} className="p-12 text-center text-muted-foreground animate-pulse">
+                      Updating records...
+                    </td>
+                  </tr>
+                )}
 
-              {!loading && filteredAppointments.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="p-4 text-center text-muted-foreground">
-                    No appointments found
-                  </td>
-                </tr>
-              )}
+                {!loading && filteredAppointments.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="p-12 text-center text-muted-foreground">
+                      No appointments found. Use 'New Appointment' to add one.
+                    </td>
+                  </tr>
+                )}
 
-              {filteredAppointments.map((a) => (
-                <tr key={a.id} className="border-t">
-                  <td className="p-2">{a.patientName}</td>
-                  <td className="p-2">{a.doctorName}</td>
-                  <td className="p-2">{a.date}</td>
-                  <td className="p-2">{a.time}</td>
-                  <td className="p-2">Rs. {a.amount}</td>
-                  <td className="p-2">
-                    <Badge className={cn(statusConfig[a.status].className)}>
-                      {statusConfig[a.status].label}
-                    </Badge>
-                  </td>
-                  <td className="p-2 flex gap-2">
-                    {a.status === "Scheduled" && (
-                      <>
-                        <Button size="sm" onClick={() => updateStatus(a.id, "Confirmed")}>
-                          <Check className="h-4 w-4" />
+                {filteredAppointments.map((a) => (
+                  <tr key={a.id} className="hover:bg-primary/[0.02] transition-colors group">
+                    <td className="p-5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                          {a.patientName.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground">{a.patientName}</p>
+                          <p className="text-xs text-muted-foreground">{a.phone}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-5 capitalize">
+                      <div className="flex flex-col">
+                        <span className="font-medium">{a.date}</span>
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Check className="h-3 w-3" /> {a.time}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="p-5 font-bold text-foreground">
+                      Rs. {a.amount}
+                    </td>
+                    <td className="p-5">
+                      <Badge className={cn("px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight", statusConfig[a.status].className)}>
+                        {statusConfig[a.status].label}
+                      </Badge>
+                    </td>
+                    <td className="p-5 pl-0">
+                      <div className="flex items-center justify-center gap-1.5 translate-x-3">
+                        {a.status === "Scheduled" && (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              className="bg-success hover:bg-success/90 text-white h-7 px-3 rounded-lg text-[10px] font-bold shadow-md shadow-success/10"
+                              onClick={() => updateStatus(a.id, "Confirmed")}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-3 rounded-lg text-[10px] font-bold border-destructive/20 text-destructive hover:bg-destructive hover:text-white"
+                              onClick={() => updateStatus(a.id, "Canceled")}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+
+                        {a.status === "Confirmed" && (
+                          <Button
+                            size="sm"
+                            className="bg-warning hover:bg-warning/80 text-warning-foreground h-8 px-4 rounded-xl shadow-sm text-xs font-bold"
+                            onClick={() => updateStatus(a.id, "In-Progress")}
+                          >
+                            Start Visit
+                          </Button>
+                        )}
+                        {a.status === "In-Progress" && (
+                          <Button
+                            size="sm"
+                            className="bg-primary hover:opacity-90 text-primary-foreground h-8 px-4 rounded-xl shadow-lg shadow-primary/10 text-xs font-bold"
+                            onClick={() => updateStatus(a.id, "Completed")}
+                          >
+                            Mark Complete
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 transition-opacity opacity-0 group-hover:opacity-100">
+                          <MoreVertical className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="destructive" onClick={() => updateStatus(a.id, "Canceled")}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                    {a.status === "Confirmed" && (
-                      <Button size="sm" onClick={() => updateStatus(a.id, "In-Progress")}>
-                        Start
-                      </Button>
-                    )}
-                    {a.status === "In-Progress" && (
-                      <Button size="sm" onClick={() => updateStatus(a.id, "Completed")}>
-                        Complete
-                      </Button>
-                    )}
-                    <Button size="sm" variant="ghost">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
+
+      <AppointmentFormModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSuccess={fetchAppointments} 
+      />
     </MainLayout>
   );
 }

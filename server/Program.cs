@@ -1,7 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using server.Data;
 using server.Data.Models;
 using server.Services;
+using server.Auth;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,15 +16,42 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        // THIS LINE FIXES EVERYTHING
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-        // Optional: Use camelCase if you want (not required)
-        // options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     });
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<INotificationService, ConsoleNotificationService>();
+builder.Services.AddScoped<AlertService>();
+
+// Auth services
+builder.Services.AddScoped<JwtService>();
+builder.Services.AddScoped<EmailService>();
+
+// JWT Authentication
+var jwtSecret = builder.Configuration["Jwt:Secret"]
+    ?? throw new InvalidOperationException("JWT Secret is not configured");
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+        ValidateIssuer = true,
+        ValidIssuer = "MMGC",
+        ValidateAudience = true,
+        ValidAudience = "MMGC",
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.Zero
+    };
+});
 
 // Database
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -57,6 +88,7 @@ if (app.Environment.IsDevelopment())
 app.UseStaticFiles();
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
+app.UseAuthentication();  // Must be before UseAuthorization
 app.UseAuthorization();
 app.MapControllers();
 
@@ -107,6 +139,25 @@ using (var scope = app.Services.CreateScope())
         }
         if (added > 0) await db.SaveChangesAsync();
         Console.WriteLine(added > 0 ? $"Seeded {added} lab tests." : "Lab tests already exist.");
+
+        // ── Data Sync: Link existing Users to Profiles ──
+        Console.WriteLine("Syncing User-to-Profile links...");
+        var usersWithDoc = await db.Users.Where(u => u.DoctorProfileId != null).ToListAsync();
+        foreach (var u in usersWithDoc)
+        {
+            var profile = await db.Doctors.FindAsync(u.DoctorProfileId);
+            if (profile != null && profile.UserId == null) { profile.UserId = u.Id; }
+        }
+
+        var usersWithPat = await db.Users.Where(u => u.PatientProfileId != null).ToListAsync();
+        foreach (var u in usersWithPat)
+        {
+            var profile = await db.Patients.FindAsync(u.PatientProfileId);
+            if (profile != null && profile.UserId == null) { profile.UserId = u.Id; }
+        }
+
+        await db.SaveChangesAsync();
+        Console.WriteLine("Data sync complete!");
     }
     catch (Exception ex)
     {

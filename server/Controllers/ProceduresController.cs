@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using server.Data;
 using server.Data.Models;
+using server.Services;
 using System.ComponentModel.DataAnnotations;
 
 namespace server.Controllers
@@ -12,11 +13,13 @@ namespace server.Controllers
     {
         private readonly AppDbContext _context;
         private readonly ILogger<ProceduresController> _logger;
+        private readonly AlertService _alertService;
 
-        public ProceduresController(AppDbContext context, ILogger<ProceduresController> logger)
+        public ProceduresController(AppDbContext context, ILogger<ProceduresController> logger, AlertService alertService)
         {
             _context = context;
             _logger = logger;
+            _alertService = alertService;
         }
 
         [HttpGet]
@@ -114,6 +117,7 @@ namespace server.Controllers
                     Notes = dto.Notes,
                     Prescription = dto.Prescription,
                     ReportUrl = dto.ReportUrl,
+                    Status = string.IsNullOrEmpty(dto.Status) ? "Performed" : dto.Status,
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -148,7 +152,15 @@ namespace server.Controllers
                 _context.Invoices.Add(invoice);
                 await _context.SaveChangesAsync();
 
-                // 4. Update Procedure with TransactionId (for convenience)
+                // 4. Notify Patient
+                await _alertService.NotifyPatientAsync(
+                    procedure.PatientId,
+                    "Procedure Updated",
+                    $"A new medical procedure '{procedure.ProcedureType}' has been recorded for you with status: {procedure.Status}.",
+                    "Procedure"
+                );
+
+                // 5. Update Procedure with TransactionId (for convenience)
                 procedure.TransactionId = financeTransaction.Id;
                 await _context.SaveChangesAsync();
 
@@ -219,5 +231,6 @@ namespace server.Controllers
         public string? Notes { get; set; }
         public string? Prescription { get; set; }
         public string? ReportUrl { get; set; }
+        public string? Status { get; set; }
     }
 }

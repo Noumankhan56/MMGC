@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Calendar,
@@ -11,8 +11,10 @@ import {
   ClipboardList,
   Menu,
   X,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/Auth/AuthContext";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -33,6 +35,18 @@ const navigation = [
 export function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const handleSignOut = async () => {
+    await logout();
+    navigate("/auth/login", { replace: true });
+  };
+
+  // Get user initials for the avatar
+  const userInitials = user?.name
+    ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "A";
 
   return (
     <div className="min-h-screen bg-background">
@@ -94,16 +108,23 @@ export function Layout({ children }: LayoutProps) {
             })}
           </nav>
 
-          {/* Footer */}
+          {/* Footer with Sign Out */}
           <div className="border-t border-border p-4">
             <div className="flex items-center space-x-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-secondary-foreground font-semibold">
-                A
+                {userInitials}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">Admin User</p>
-                <p className="text-xs text-muted-foreground truncate">admin@mmgc.com</p>
+                <p className="text-sm font-medium text-foreground truncate">{user?.name || "Admin User"}</p>
+                <p className="text-xs text-muted-foreground truncate">{user?.email || "admin@mmgc.com"}</p>
               </div>
+              <button
+                onClick={handleSignOut}
+                title="Sign Out"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
             </div>
           </div>
         </div>

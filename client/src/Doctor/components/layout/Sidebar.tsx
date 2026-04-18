@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Stethoscope,
@@ -27,6 +27,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/Doctor/components/ui/collapsible";
+import { useAuth } from "@/Auth/AuthContext";
 
 interface NavItem {
   title: string;
@@ -38,7 +39,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     title: "Dashboard",
-    href: "/",
+    href: "/doctor/dashboard",
     icon: LayoutDashboard,
   },
   {
@@ -54,47 +55,47 @@ const navItems: NavItem[] = [
   },
   {
     title: "Nursing Staff",
-    href: "/nursing",
+    href: "/doctor/nursing",
     icon: Heart,
     children: [
-      { title: "Patient Care", href: "/nursing/care" },
-      { title: "Vitals Recording", href: "/nursing/vitals" },
-      { title: "Progress Notes", href: "/nursing/notes" },
+      { title: "Patient Care", href: "/doctor/nursing/care" },
+      { title: "Vitals Recording", href: "/doctor/nursing/vitals" },
+      { title: "Progress Notes", href: "/doctor/nursing/notes" },
     ],
   },
   {
     title: "Reception",
-    href: "/reception",
+    href: "/doctor/reception",
     icon: UserCog,
     children: [
-      { title: "Patient Registration", href: "/reception/register" },
-      { title: "Appointments", href: "/reception/appointments" },
-      { title: "MR Numbers", href: "/reception/mr-numbers" },
+      { title: "Patient Registration", href: "/doctor/reception/register" },
+      { title: "Appointments", href: "/doctor/reception/appointments" },
+      { title: "MR Numbers", href: "/doctor/reception/mr-numbers" },
     ],
   },
   {
     title: "Laboratory",
-    href: "/laboratory",
+    href: "/doctor/laboratory",
     icon: FlaskConical,
     children: [
-      { title: "Sample Management", href: "/laboratory/samples" },
-      { title: "Test Reports", href: "/laboratory/reports" },
-      { title: "Ultrasound", href: "/laboratory/ultrasound" },
+      { title: "Sample Management", href: "/doctor/laboratory/samples" },
+      { title: "Test Reports", href: "/doctor/laboratory/reports" },
+      { title: "Ultrasound", href: "/doctor/laboratory/ultrasound" },
     ],
   },
   {
     title: "Accounts",
-    href: "/accounts",
+    href: "/doctor/accounts",
     icon: CreditCard,
     children: [
-      { title: "Invoices", href: "/accounts/invoices" },
-      { title: "Payments", href: "/accounts/payments" },
-      { title: "Financial Reports", href: "/accounts/reports" },
+      { title: "Invoices", href: "/doctor/accounts/invoices" },
+      { title: "Payments", href: "/doctor/accounts/payments" },
+      { title: "Financial Reports", href: "/doctor/accounts/reports" },
     ],
   },
   {
     title: "Settings",
-    href: "/settings",
+    href: "/doctor/settings",
     icon: Settings,
   },
 ];
@@ -103,6 +104,8 @@ export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const [openSections, setOpenSections] = useState<string[]>(["Doctor Module"]);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const toggleSection = (title: string) => {
     setOpenSections((prev) =>
@@ -112,9 +115,30 @@ export function Sidebar() {
     );
   };
 
+  useEffect(() => {
+    // Find section that contains current active child
+    const currentSection = navItems.find((item) =>
+      item.children?.some((child) => location.pathname === child.href)
+    );
+
+    if (currentSection && !openSections.includes(currentSection.title)) {
+      setOpenSections((prev) => [...prev, currentSection.title]);
+    }
+  }, [location.pathname]);
+
   const isActiveRoute = (href: string) => {
     return location.pathname === href || location.pathname.startsWith(href + "/");
   };
+
+  const handleSignOut = async () => {
+    await logout();
+    navigate("/auth/login", { replace: true });
+  };
+
+  // Get user initials for the avatar
+  const userInitials = user?.name
+    ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "DR";
 
   return (
     <>
@@ -227,16 +251,22 @@ export function Sidebar() {
         {/* User Profile */}
         <div className="p-4 border-t border-sidebar-border">
           <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-9 h-9 rounded-full bg-sidebar-primary flex items-center justify-center">
-              <span className="text-sm font-semibold text-sidebar-primary-foreground">DR</span>
+            <div className="w-9 h-9 rounded-full bg-sidebar-primary overflow-hidden flex items-center justify-center shrink-0">
+              {user?.profilePictureUrl ? (
+                <img src={user.profilePictureUrl} alt={user.name} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-sm font-semibold text-sidebar-primary-foreground">{userInitials}</span>
+              )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">Dr. Sarah Wilson</p>
-              <p className="text-xs text-sidebar-foreground/70 truncate">Gynecologist</p>
+              <p className="text-sm font-medium truncate">{user?.name || "Doctor"}</p>
+              <p className="text-xs text-sidebar-foreground/70 truncate">{user?.email || "doctor@mmgc.com"}</p>
             </div>
             <Button
               variant="ghost"
               size="icon"
+              onClick={handleSignOut}
+              title="Sign Out"
               className="h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
             >
               <LogOut className="h-4 w-4" />

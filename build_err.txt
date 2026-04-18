@@ -1,0 +1,17 @@
+﻿C:\Users\user\OneDrive\Desktop\MMGC\server\Services\AuthService.cs(43,72): error CS0117: 'BCrypt' does not contain a definition for 'VerifyPassword' [C:\Users\user\OneDrive\Desktop\MMGC\server\server.csproj]
+C:\Users\user\OneDrive\Desktop\MMGC\server\Program.cs(69,84): error CS0234: The type or namespace name 'Jwt' does not exist in the namespace 'Microsoft.IdentityModel.Tokens' (are you missing an assembly reference?) [C:\Users\user\OneDrive\Desktop\MMGC\server\server.csproj]
+C:\Users\user\OneDrive\Desktop\MMGC\server\Controllers\ReportsController.cs(314,13): warning CS0618: 'ExcelPackage.LicenseContext' is obsolete: 'Please use the static 'ExcelPackage.License' property to set the required license information from EPPlus 8 and later versions. For more info see http://epplussoftware.com/developers/licensenotsetexception.' [C:\Users\user\OneDrive\Desktop\MMGC\server\server.csproj]
+C:\Users\user\OneDrive\Desktop\MMGC\server\Controllers\ReportsController.cs(314,43): warning CS0618: 'LicenseContext' is obsolete: 'Used in versions prior to EPPlus 8. Will be removed in coming versions.' [C:\Users\user\OneDrive\Desktop\MMGC\server\server.csproj]
+C:\Users\user\OneDrive\Desktop\MMGC\server\Controllers\DashboardController.cs(77,35): warning CS8602: Dereference of a possibly null reference. [C:\Users\user\OneDrive\Desktop\MMGC\server\server.csproj]
+
+Build FAILED.
+
+C:\Users\user\OneDrive\Desktop\MMGC\server\Controllers\ReportsController.cs(314,13): warning CS0618: 'ExcelPackage.LicenseContext' is obsolete: 'Please use the static 'ExcelPackage.License' property to set the required license information from EPPlus 8 and later versions. For more info see http://epplussoftware.com/developers/licensenotsetexception.' [C:\Users\user\OneDrive\Desktop\MMGC\server\server.csproj]
+C:\Users\user\OneDrive\Desktop\MMGC\server\Controllers\ReportsController.cs(314,43): warning CS0618: 'LicenseContext' is obsolete: 'Used in versions prior to EPPlus 8. Will be removed in coming versions.' [C:\Users\user\OneDrive\Desktop\MMGC\server\server.csproj]
+C:\Users\user\OneDrive\Desktop\MMGC\server\Controllers\DashboardController.cs(77,35): warning CS8602: Dereference of a possibly null reference. [C:\Users\user\OneDrive\Desktop\MMGC\server\server.csproj]
+C:\Users\user\OneDrive\Desktop\MMGC\server\Services\AuthService.cs(43,72): error CS0117: 'BCrypt' does not contain a definition for 'VerifyPassword' [C:\Users\user\OneDrive\Desktop\MMGC\server\server.csproj]
+C:\Users\user\OneDrive\Desktop\MMGC\server\Program.cs(69,84): error CS0234: The type or namespace name 'Jwt' does not exist in the namespace 'Microsoft.IdentityModel.Tokens' (are you missing an assembly reference?) [C:\Users\user\OneDrive\Desktop\MMGC\server\server.csproj]
+    3 Warning(s)
+    2 Error(s)
+
+Time Elapsed 00:00:03.59

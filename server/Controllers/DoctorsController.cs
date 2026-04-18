@@ -42,7 +42,17 @@ namespace server.Controllers
                         Specialization = d.Specialization ?? "General Physician",
                         d.Phone,
                         d.Email,
+                        d.Bio,
+                        d.Address,
+                        d.ClinicName,
+                        d.ClinicPhone,
+                        d.ClinicAddress,
+                        d.ClinicTimings,
+                        d.ConsultationFee,
+                        d.FollowUpFee,
+                        d.ProfilePictureUrl,
                         Status = d.IsActive ? "Active" : "Inactive",
+                        IsRegistered = d.UserId != null,
 
                         TotalAppointments = d.Appointments.Count,
                         TotalRevenue = d.Appointments.Sum(a => a.Amount),
@@ -91,6 +101,27 @@ namespace server.Controllers
                     doctor.Phone,
                     doctor.Email,
                     Status = doctor.IsActive ? "Active" : "Inactive",
+                    doctor.LicenseNumber,
+                    doctor.Address,
+                    doctor.Bio,
+                    doctor.ProfilePictureUrl,
+
+                    // Clinic Info
+                    doctor.ClinicName,
+                    doctor.ClinicPhone,
+                    doctor.ClinicAddress,
+                    doctor.ClinicTimings,
+                    doctor.ConsultationFee,
+                    doctor.FollowUpFee,
+
+                    // Notification Preferences
+                    doctor.EmailAlerts,
+                    doctor.SmsAlerts,
+                    doctor.AppointmentReminders,
+                    doctor.LabResultNotifications,
+                    doctor.PatientMessageNotifications,
+                    doctor.SystemUpdateNotifications,
+
                     TotalAppointments = doctor.Appointments.Count,
                     TotalRevenue = doctor.Appointments.Sum(a => a.Amount),
 
@@ -194,15 +225,39 @@ namespace server.Controllers
                 doctor.Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim();
                 doctor.IsActive = dto.IsActive;
 
-                doctor.WorkSchedule = dto.WorkSchedule?
-                    .Where(s => !string.IsNullOrEmpty(s.Start) && !string.IsNullOrEmpty(s.End))
-                    .Select(s => new WorkSlot
-                    {
-                        Day = s.Day,
-                        Start = s.Start,
-                        End = s.End
-                    })
-                    .ToList() ?? new List<WorkSlot>();
+                // Professional Info
+                doctor.LicenseNumber = dto.LicenseNumber;
+                doctor.Address = dto.Address;
+                doctor.Bio = dto.Bio;
+
+                // Clinic Info
+                doctor.ClinicName = dto.ClinicName;
+                doctor.ClinicPhone = dto.ClinicPhone;
+                doctor.ClinicAddress = dto.ClinicAddress;
+                doctor.ClinicTimings = dto.ClinicTimings;
+                doctor.ConsultationFee = dto.ConsultationFee;
+                doctor.FollowUpFee = dto.FollowUpFee;
+
+                // Notification Preferences
+                doctor.EmailAlerts = dto.EmailAlerts;
+                doctor.SmsAlerts = dto.SmsAlerts;
+                doctor.AppointmentReminders = dto.AppointmentReminders;
+                doctor.LabResultNotifications = dto.LabResultNotifications;
+                doctor.PatientMessageNotifications = dto.PatientMessageNotifications;
+                doctor.SystemUpdateNotifications = dto.SystemUpdateNotifications;
+
+                if (dto.WorkSchedule != null)
+                {
+                    doctor.WorkSchedule = dto.WorkSchedule
+                        .Where(s => !string.IsNullOrEmpty(s.Start) && !string.IsNullOrEmpty(s.End))
+                        .Select(s => new WorkSlot
+                        {
+                            Day = s.Day,
+                            Start = s.Start,
+                            End = s.End
+                        })
+                        .ToList();
+                }
 
                 await _context.SaveChangesAsync();
 
@@ -240,6 +295,115 @@ namespace server.Controllers
 
             return NoContent();
         }
+
+        // ---------------------------------------------------
+        // GET Dashboard Stats for Doctor
+        // ---------------------------------------------------
+        [HttpGet("{id:int}/stats")]
+        public async Task<IActionResult> GetStats(int id)
+        {
+            var doctor = await _context.Doctors.FindAsync(id);
+            if (doctor == null) return NotFound("Doctor not found");
+
+            var today = DateTime.UtcNow.Date;
+            
+            var todayAppointments = await _context.Appointments
+                .Where(a => a.DoctorId == id && a.Date == today)
+                .CountAsync();
+
+            var totalAppointments = await _context.Appointments
+                .Where(a => a.DoctorId == id)
+                .CountAsync();
+
+            var totalPatients = await _context.Appointments
+                .Where(a => a.DoctorId == id)
+                .Select(a => a.PatientId)
+                .Distinct()
+                .CountAsync();
+
+            var totalProcedures = await _context.Procedures
+                .Where(p => p.DoctorId == id)
+                .CountAsync();
+
+            var pendingReports = await _context.LabTests
+                .Where(l => l.IsCompleted && !l.IsApproved)
+                .CountAsync();
+
+            // Simplified average wait time calculation (e.g. average duration of completed today)
+            // For now, returning a realistic mock or placeholder
+            var avgWaitTime = "12 min";
+
+            return Ok(new
+            {
+                todayAppointments,
+                totalAppointments,
+                totalPatients,
+                totalProcedures,
+                pendingReports,
+                avgWaitTime
+            });
+        }
+
+        // ---------------------------------------------------
+        // APPROVE Lab Test Report
+        // ---------------------------------------------------
+        [HttpPost("{id:int}/approve-lab/{testId:int}")]
+        public async Task<IActionResult> ApproveLabTest(int id, int testId)
+        {
+            var test = await _context.LabTests.FindAsync(testId);
+            if (test == null) return NotFound("Lab test not found");
+
+            test.IsApproved = true;
+            test.ApprovedAt = DateTime.UtcNow;
+            test.ApprovedByDoctorId = id;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Report approved successfully" });
+        }
+
+        // POST: api/doctors/{id}/upload-profile-picture
+        [HttpPost("{id:int}/upload-profile-picture")]
+        public async Task<IActionResult> UploadProfilePicture(int id, IFormFile file)
+        {
+            var doctor = await _context.Doctors.FindAsync(id);
+            if (doctor == null) return NotFound("Doctor not found");
+
+            if (file == null || file.Length == 0) return BadRequest("No file uploaded");
+
+            try
+            {
+                var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "profiles");
+                if (!Directory.Exists(uploadsDir)) Directory.CreateDirectory(uploadsDir);
+
+                var fileName = $"doctor_{id}_{DateTime.UtcNow.Ticks}{Path.GetExtension(file.FileName)}";
+                var filePath = Path.Combine(uploadsDir, fileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                doctor.ProfilePictureUrl = $"/uploads/profiles/{fileName}";
+
+                // Sync to User record for Global AuthContext/Navbar update
+                if (doctor.UserId.HasValue)
+                {
+                    var user = await _context.Users.FindAsync(doctor.UserId.Value);
+                    if (user != null)
+                    {
+                        user.ProfilePictureUrl = doctor.ProfilePictureUrl;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new { url = doctor.ProfilePictureUrl });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal error: {ex.Message}");
+            }
+        }
     }
 
     // ---------------------------------------------------
@@ -261,6 +425,27 @@ namespace server.Controllers
         public string? Email { get; set; }
 
         public bool IsActive { get; set; } = true;
+
+        // Extended Info
+        public string? LicenseNumber { get; set; }
+        public string? Address { get; set; }
+        public string? Bio { get; set; }
+
+        // Clinic Info
+        public string? ClinicName { get; set; }
+        public string? ClinicPhone { get; set; }
+        public string? ClinicAddress { get; set; }
+        public string? ClinicTimings { get; set; }
+        public decimal ConsultationFee { get; set; }
+        public decimal FollowUpFee { get; set; }
+
+        // Notification Preferences
+        public bool EmailAlerts { get; set; } = true;
+        public bool SmsAlerts { get; set; } = false;
+        public bool AppointmentReminders { get; set; } = true;
+        public bool LabResultNotifications { get; set; } = true;
+        public bool PatientMessageNotifications { get; set; } = true;
+        public bool SystemUpdateNotifications { get; set; } = false;
 
         public List<WorkSlotDto>? WorkSchedule { get; set; }
     }

@@ -104,5 +104,72 @@ public async Task<IActionResult> Update(int id, [FromBody] Nurse updated)
 
             return Ok(new { message = "Nurse deleted" });
         }
+
+        // -------------------------
+        // VITALS (FR12.2)
+        // -------------------------
+        [HttpPost("vitals")]
+        public async Task<IActionResult> RecordVitals([FromBody] PatientVital vitals)
+        {
+            if (vitals.PatientId <= 0) return BadRequest("PatientId required");
+            
+            vitals.CapturedAt = DateTime.UtcNow;
+            _context.PatientVitals.Add(vitals);
+            await _context.SaveChangesAsync();
+            
+            return Ok(new { message = "Vitals recorded", id = vitals.Id });
+        }
+
+        [HttpGet("vitals/{patientId:int}")]
+        public async Task<IActionResult> GetPatientVitals(int patientId)
+        {
+            var list = await _context.PatientVitals
+                .Where(v => v.PatientId == patientId)
+                .Include(v => v.RecordedBy)
+                .OrderByDescending(v => v.CapturedAt)
+                .ToListAsync();
+            return Ok(list);
+        }
+
+        // -------------------------
+        // NURSING NOTES (FR12.2, FR12.3)
+        // -------------------------
+        [HttpPost("notes")]
+        public async Task<IActionResult> AddNote([FromBody] NursingNote note)
+        {
+            if (note.PatientId <= 0 || note.NurseId <= 0) 
+                return BadRequest("PatientId and NurseId required");
+
+            note.CreatedAt = DateTime.UtcNow;
+            _context.NursingNotes.Add(note);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Note added", id = note.Id });
+        }
+
+        [HttpGet("notes/{patientId:int}")]
+        public async Task<IActionResult> GetPatientNotes(int patientId)
+        {
+            var list = await _context.NursingNotes
+                .Where(n => n.PatientId == patientId)
+                .Include(n => n.Nurse)
+                .Include(n => n.Procedure)
+                .OrderByDescending(n => n.CreatedAt)
+                .ToListAsync();
+            return Ok(list);
+        }
+
+        [HttpPut("notes/{id:int}")]
+        public async Task<IActionResult> UpdateNote(int id, [FromBody] NursingNote updated)
+        {
+            var note = await _context.NursingNotes.FindAsync(id);
+            if (note == null) return NotFound();
+
+            note.NoteContent = updated.NoteContent;
+            note.NoteType = updated.NoteType ?? note.NoteType;
+            
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Note updated" });
+        }
     }
 }

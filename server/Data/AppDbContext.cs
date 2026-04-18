@@ -19,6 +19,10 @@ namespace server.Data
         public DbSet<Invoice> Invoices { get; set; } = null!;
         public DbSet<Report> Reports { get; set; } = null!;
         public DbSet<Procedure> Procedures { get; set; } = null!;
+        public DbSet<PatientVital> PatientVitals { get; set; } = null!;
+        public DbSet<NursingNote> NursingNotes { get; set; } = null!;
+        public DbSet<Notification> Notifications { get; set; } = null!;
+        public DbSet<ContactMessage> ContactMessages { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -34,7 +38,27 @@ namespace server.Data
                 entity.Property(u => u.Id).ValueGeneratedOnAdd();
                 entity.Property(u => u.Name).IsRequired().HasMaxLength(100);
                 entity.Property(u => u.Email).IsRequired().HasMaxLength(150);
+                entity.Property(u => u.PasswordHash).HasMaxLength(250);
+                entity.Property(u => u.Role).IsRequired().HasMaxLength(50).HasDefaultValue("Patient");
+                entity.Property(u => u.GoogleId).HasMaxLength(200);
+                entity.Property(u => u.IsEmailVerified).HasDefaultValue(false);
+                entity.Property(u => u.EmailVerificationToken).HasMaxLength(500);
+                entity.Property(u => u.RefreshToken).HasMaxLength(500);
+                entity.Property(u => u.Phone).HasMaxLength(20);
                 entity.Property(u => u.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasIndex(u => u.Email).IsUnique();
+                entity.HasIndex(u => u.GoogleId).IsUnique().HasFilter("\"GoogleId\" IS NOT NULL");
+
+                entity.HasOne(u => u.DoctorProfile)
+                      .WithMany()
+                      .HasForeignKey(u => u.DoctorProfileId)
+                      .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(u => u.PatientProfile)
+                      .WithMany()
+                      .HasForeignKey(u => u.PatientProfileId)
+                      .OnDelete(DeleteBehavior.SetNull);
             });
 
 // -------------------------
@@ -57,11 +81,15 @@ modelBuilder.Entity<Doctor>(entity =>
         ws.Property(w => w.End).HasMaxLength(10);
     });
 
-    // Appointments relationship
     entity.HasMany(d => d.Appointments)
           .WithOne(a => a.Doctor)
           .HasForeignKey(a => a.DoctorId)
           .OnDelete(DeleteBehavior.Restrict);
+
+    entity.HasOne(d => d.UserAccount)
+          .WithOne()
+          .HasForeignKey<Doctor>(d => d.UserId)
+          .OnDelete(DeleteBehavior.SetNull);
 });
 
 
@@ -107,6 +135,10 @@ modelBuilder.Entity<Nurse>(entity =>
                 entity.Property(p => p.Name).IsRequired().HasMaxLength(100);
                 entity.Property(p => p.Phone).HasMaxLength(20);
                 entity.Property(p => p.Email).HasMaxLength(150);
+                entity.Property(p => p.Address).HasMaxLength(500);
+                entity.Property(p => p.BloodGroup).HasMaxLength(10);
+                entity.Property(p => p.EmergencyContactName).HasMaxLength(100);
+                entity.Property(p => p.EmergencyContactPhone).HasMaxLength(20);
                 entity.Property(p => p.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                 entity.HasMany(p => p.Appointments)
@@ -116,6 +148,11 @@ modelBuilder.Entity<Nurse>(entity =>
                 entity.HasMany(p => p.LabTests)
                       .WithOne(l => l.Patient)
                       .HasForeignKey(l => l.PatientId);
+
+                entity.HasOne(p => p.UserAccount)
+                      .WithOne()
+                      .HasForeignKey<Patient>(p => p.UserId)
+                      .OnDelete(DeleteBehavior.SetNull);
             });
 
             // -------------------------
@@ -196,6 +233,7 @@ modelBuilder.Entity<Procedure>(entity =>
     entity.Property(p => p.PerformedAt)
           .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+    entity.Property(p => p.Status).HasMaxLength(50).HasDefaultValue("Performed");
     entity.Property(p => p.CreatedAt)
           .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
@@ -272,6 +310,11 @@ modelBuilder.Entity<Procedure>(entity =>
                       .WithMany()
                       .HasForeignKey(l => l.AssignedToStaffId)
                       .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(l => l.ApprovedByDoctor)
+                      .WithMany()
+                      .HasForeignKey(l => l.ApprovedByDoctorId)
+                      .OnDelete(DeleteBehavior.SetNull);
             });
 
             // -------------------------
@@ -316,10 +359,90 @@ modelBuilder.Entity<Procedure>(entity =>
                       .OnDelete(DeleteBehavior.Cascade);
             });
 
+            // -------------------------
+            // PATIENT VITALS
+            // -------------------------
+            modelBuilder.Entity<PatientVital>(entity =>
+            {
+                entity.ToTable("PatientVitals");
+                entity.HasKey(v => v.Id);
+                entity.Property(v => v.Id).ValueGeneratedOnAdd();
+                entity.Property(v => v.CapturedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(v => v.BloodPressure).HasMaxLength(20);
+                entity.Property(v => v.Notes).HasMaxLength(500);
+
+                entity.HasOne(v => v.Patient)
+                      .WithMany()
+                      .HasForeignKey(v => v.PatientId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(v => v.RecordedBy)
+                      .WithMany()
+                      .HasForeignKey(v => v.RecordedByNurseId)
+                      .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // -------------------------
+            // NURSING NOTES
+            // -------------------------
+            modelBuilder.Entity<NursingNote>(entity =>
+            {
+                entity.ToTable("NursingNotes");
+                entity.HasKey(n => n.Id);
+                entity.Property(n => n.Id).ValueGeneratedOnAdd();
+                entity.Property(n => n.NoteContent).IsRequired().HasMaxLength(1000);
+                entity.Property(n => n.NoteType).HasMaxLength(100);
+                entity.Property(n => n.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(n => n.Patient)
+                      .WithMany()
+                      .HasForeignKey(n => n.PatientId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(n => n.Nurse)
+                      .WithMany()
+                      .HasForeignKey(n => n.NurseId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(n => n.Procedure)
+                      .WithMany()
+                      .HasForeignKey(n => n.ProcedureId)
+                      .OnDelete(DeleteBehavior.SetNull);
+            });
+
             // Indexes
             modelBuilder.Entity<Appointment>().HasIndex(a => a.CreatedAt);
             modelBuilder.Entity<Transaction>().HasIndex(t => t.PaidAt);
             modelBuilder.Entity<Procedure>().HasIndex(p => p.PerformedAt);
+            modelBuilder.Entity<PatientVital>().HasIndex(v => v.CapturedAt);
+            modelBuilder.Entity<NursingNote>().HasIndex(n => n.CreatedAt);
+            modelBuilder.Entity<Notification>(entity =>
+            {
+                entity.ToTable("Notifications");
+                entity.HasKey(n => n.Id);
+                entity.Property(n => n.Title).IsRequired().HasMaxLength(200);
+                entity.Property(n => n.Body).IsRequired().HasMaxLength(1000);
+                entity.Property(n => n.Date).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(n => n.Patient)
+                      .WithMany()
+                      .HasForeignKey(n => n.PatientId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // -------------------------
+            // CONTACT MESSAGES
+            // -------------------------
+            modelBuilder.Entity<ContactMessage>(entity =>
+            {
+                entity.ToTable("ContactMessages");
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.Name).IsRequired().HasMaxLength(150);
+                entity.Property(c => c.Email).IsRequired().HasMaxLength(150);
+                entity.Property(c => c.Subject).IsRequired().HasMaxLength(200);
+                entity.Property(c => c.Message).IsRequired().HasMaxLength(2000);
+                entity.Property(c => c.SubmittedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            });
         }
     }
 }

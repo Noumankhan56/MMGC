@@ -15,7 +15,7 @@ namespace server.Data.Models
         public int LabTestTypeId { get; set; }
 
         // FR6.2 – Staff assignment
-        public int? AssignedToStaffId { get; set; }  // Links to a future LabTechnician or Nurse
+        public int? AssignedToStaffId { get; set; }
 
         // Test Details
         public DateTime OrderedAt { get; set; } = DateTime.UtcNow;
@@ -23,20 +23,25 @@ namespace server.Data.Models
         public DateTime? ReportedAt { get; set; }
 
         [MaxLength(500)]
-        public string? DoctorNotes { get; set; }      // Notes from requesting doctor
+        public string? DoctorNotes { get; set; }
 
         [MaxLength(3000)]
-        public string? ReportFindings { get; set; }   // Text findings (optional)
+        public string? ReportFindings { get; set; }
 
-        public string? ReportFilePath { get; set; }   // PDF / Image path (FR6.3)
+        public string? ReportFilePath { get; set; }
 
         public bool IsUrgent { get; set; } = false;
         public bool IsCompleted { get; set; } = false;
 
+        // FR11.2 & FR11.3 - Approval for Reports
+        public bool IsApproved { get; set; } = false;
+        public DateTime? ApprovedAt { get; set; }
+        public int? ApprovedByDoctorId { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
 
-        // Navigation Properties (FR6.4 – linked to patient history)
+        // Navigation Properties
         [ForeignKey("PatientId")]
         public Patient? Patient { get; set; }
 
@@ -44,6 +49,9 @@ namespace server.Data.Models
         public LabTestType? TestType { get; set; }
 
         [ForeignKey("AssignedToStaffId")]
-        public Nurse? AssignedToStaff { get; set; }   // Reusing Nurse for now (or create LabTechnician later)
+        public Nurse? AssignedToStaff { get; set; }
+
+        [ForeignKey("ApprovedByDoctorId")]
+        public Doctor? ApprovedByDoctor { get; set; }
     }
 }

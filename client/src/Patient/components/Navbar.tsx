@@ -13,10 +13,12 @@ import {
   Stethoscope,
   ShieldCheck,
   ChevronDown,
+  User,
 } from "lucide-react";
 
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/Auth/AuthContext";
 
 const navLinks = [
   { label: "Home", href: "/" },
@@ -29,6 +31,16 @@ const navLinks = [
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
+
+  const handlePatientPortal = () => {
+    if (isAuthenticated && user?.role === "Patient") {
+      navigate("/dashboard");
+    } else {
+      navigate("/auth/login?role=Patient");
+    }
+  };
 
   return (
     <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-lg border-b border-border">
@@ -85,7 +97,7 @@ const Navbar = () => {
             >
               <DropdownMenuItem asChild>
                 <Link
-                  to="/doctor"
+                  to="/auth/login?role=Doctor"
                   className="flex items-center gap-2 cursor-pointer"
                 >
                   <Stethoscope className="h-4 w-4" />
@@ -95,7 +107,7 @@ const Navbar = () => {
 
               <DropdownMenuItem asChild>
                 <Link
-                  to="/admin"
+                  to="/auth/login?role=Admin"
                   className="flex items-center gap-2 cursor-pointer"
                 >
                   <ShieldCheck className="h-4 w-4" />
@@ -106,12 +118,12 @@ const Navbar = () => {
           </DropdownMenu>
 
           {/* Patient Portal Button */}
-          <Link
-            to="/dashboard"
+          <button
+            onClick={handlePatientPortal}
             className="px-5 py-2 rounded-lg font-medium bg-primary text-white border border-primary transition hover:bg-white hover:text-primary"
           >
             Patient Portal
-          </Link>
+          </button>
         </div>
 
         {/* Mobile Button */}
@@ -142,25 +154,28 @@ const Navbar = () => {
             <div className="border-t pt-4 flex flex-col gap-3">
 
               <Button variant="outline" asChild>
-                <Link to="/doctor">
+                <Link to="/auth/login?role=Doctor" onClick={() => setMobileOpen(false)}>
                   <Stethoscope className="mr-2 h-4 w-4" />
                   Doctor Login
                 </Link>
               </Button>
 
               <Button variant="outline" asChild>
-                <Link to="/admin">
+                <Link to="/auth/login?role=Admin" onClick={() => setMobileOpen(false)}>
                   <ShieldCheck className="mr-2 h-4 w-4" />
                   Admin Login
                 </Link>
               </Button>
 
-              <Link
-                to="/dashboard"
+              <button
+                onClick={() => {
+                  setMobileOpen(false);
+                  handlePatientPortal();
+                }}
                 className="px-4 py-2 rounded-lg font-medium text-center bg-primary text-white border border-primary hover:bg-white hover:text-primary transition"
               >
                 Patient Portal
-              </Link>
+              </button>
 
             </div>
           </div>

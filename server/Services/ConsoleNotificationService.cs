@@ -4,8 +4,19 @@ namespace server.Services
     {
         public Task SendAsync(string phone, string message)
         {
-            // For now just write to console – replace later with Twilio/WhatsApp
             Console.WriteLine($"[SMS] To {phone}: {message}");
+            return Task.CompletedTask;
+        }
+
+        public Task SendWhatsAppAsync(string phone, string message)
+        {
+            Console.WriteLine($"[WhatsApp] To {phone}: {message}");
+            return Task.CompletedTask;
+        }
+
+        public Task SendEmailAsync(string email, string subject, string body)
+        {
+            Console.WriteLine($"[Email] To {email} (Subject: {subject}): {body}");
             return Task.CompletedTask;
         }
     }

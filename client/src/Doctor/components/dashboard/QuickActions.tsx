@@ -9,71 +9,68 @@ import {
 import { Button } from "@/Doctor/components/ui/button";
 import { cn } from "@/Doctor/lib/utils";
 
-interface QuickAction {
-  title: string;
-  description: string;
-  icon: React.ElementType;
-  color: "primary" | "secondary" | "success" | "warning";
-  href: string;
+interface QuickActionsProps {
+  onAction?: (title: string) => void;
 }
 
-const actions: QuickAction[] = [
-  {
-    title: "New Patient",
-    description: "Register a new patient",
-    icon: UserPlus,
-    color: "primary",
-    href: "/reception/register",
-  },
+const colorClasses: Record<string, string> = {
+  primary: "bg-primary/5 text-primary border-primary/20 hover:bg-primary/10",
+  secondary: "bg-secondary/5 text-secondary border-secondary/20 hover:bg-secondary/10",
+  success: "bg-success/5 text-success border-success/20 hover:bg-success/10",
+  warning: "bg-warning/5 text-warning border-warning/20 hover:bg-warning/10",
+  info: "bg-info/5 text-info border-info/20 hover:bg-info/10",
+  destructive: "bg-destructive/5 text-destructive border-destructive/20 hover:bg-destructive/10",
+};
+
+const actions = [
   {
     title: "Book Appointment",
-    description: "Schedule consultation",
+    description: "Schedule visits",
     icon: CalendarPlus,
-    color: "secondary",
-    href: "/reception/appointments",
+    color: "primary",
   },
   {
     title: "Add Procedure",
     description: "Record treatment",
     icon: Stethoscope,
     color: "success",
-    href: "/doctor/procedures",
   },
   {
-    title: "Lab Test",
+    title: "New Lab Test",
     description: "Order diagnostics",
     icon: FlaskConical,
     color: "warning",
-    href: "/laboratory/samples",
+  },
+  {
+    title: "Patient History",
+    description: "View records",
+    icon: FileText,
+    color: "info",
   },
 ];
 
-const colorClasses = {
-  primary: "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground",
-  secondary: "bg-secondary/10 text-secondary hover:bg-secondary hover:text-secondary-foreground",
-  success: "bg-success/10 text-success hover:bg-success hover:text-success-foreground",
-  warning: "bg-warning/10 text-warning hover:bg-warning hover:text-warning-foreground",
-};
-
-export function QuickActions() {
+export function QuickActions({ onAction }: QuickActionsProps) {
   return (
-    <div className="bg-card rounded-xl border border-border/50 shadow-card p-5">
-      <h3 className="font-semibold text-foreground mb-4">Quick Actions</h3>
-      <div className="grid grid-cols-2 gap-3">
+    <div className="bg-card rounded-xl border border-border/50 shadow-card p-5 h-full flex flex-col">
+      <h3 className="font-bold text-foreground mb-4 uppercase text-[10px] tracking-widest pl-1 border-l-2 border-primary/50">Quick Actions</h3>
+      <div className="grid grid-cols-2 gap-3 flex-1">
         {actions.map((action) => (
           <button
             key={action.title}
+            onClick={() => onAction?.(action.title)}
             className={cn(
-              "flex flex-col items-center justify-center p-4 rounded-xl transition-all duration-200 group",
+              "flex flex-col items-center justify-center p-4 rounded-2xl transition-all duration-300 group shadow-sm hover:shadow-xl border text-center",
               colorClasses[action.color]
             )}
           >
-            <action.icon className="h-6 w-6 mb-2" />
-            <span className="text-sm font-medium">{action.title}</span>
-            <span className="text-xs opacity-70 hidden sm:block">{action.description}</span>
+            <action.icon className="h-6 w-6 mb-2 group-hover:scale-110 transition-transform" />
+            <span className="text-xs font-bold tracking-tight">{action.title}</span>
+            <span className="text-[9px] opacity-70 hidden sm:block font-medium group-hover:opacity-100 mt-0.5">{action.description}</span>
           </button>
         ))}
       </div>
     </div>
   );
 }
+
+

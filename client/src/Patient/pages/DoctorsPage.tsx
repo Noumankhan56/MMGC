@@ -5,105 +5,41 @@ import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent } from "../components/ui/card";
 import { Search, Star, Calendar, ChevronRight, Activity, Filter, Users } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import heroImage from "../assets/hero-medical.jpg";
 
-const allDoctors = [
-  {
-    id: 1,
-    name: "Dr. Sarah Ahmed",
-    specialty: "Gynaecologist",
-    exp: "15 years",
-    rating: 4.9,
-    available: true,
-    slots: 3,
-    image: "../public/images/Dr. Sarah Ahmed.jpg"
-  },
-  {
-    id: 2,
-    name: "Dr. Kamran Ali",
-    specialty: "General Physician",
-    exp: "12 years",
-    rating: 4.8,
-    available: true,
-    slots: 5,
-    image: "../public/images/Dr. Kamran Ali.jpg"
-  },
-  {
-    id: 3,
-    name: "Dr. Fatima Khan",
-    specialty: "Radiologist",
-    exp: "10 years",
-    rating: 4.7,
-    available: false,
-    slots: 0,
-    image: "../public/images/Dr. Fatima Khan.jpg"
-  },
-  {
-    id: 4,
-    name: "Dr. Ahmed Hassan",
-    specialty: "Surgeon",
-    exp: "18 years",
-    rating: 4.9,
-    available: true,
-    slots: 2,
-    image: "../public/images/DR AHMAD HASSAN.jpg"
-  },
-  {
-    id: 5,
-    name: "Dr. Amina Raza",
-    specialty: "Gynaecologist",
-    exp: "8 years",
-    rating: 4.6,
-    available: true,
-    slots: 4,
-    image: "../public/images/Dr. Amina Raza.jpg"
-  },
-  {
-    id: 6,
-    name: "Dr. Bilal Qureshi",
-    specialty: "General Physician",
-    exp: "14 years",
-    rating: 4.8,
-    available: true,
-    slots: 1,
-    image: "../public/images/Dr. Bilal Qureshi.jpg"
-  },
-  {
-    id: 7,
-    name: "Dr. Hira Malik",
-    specialty: "Paediatrician",
-    exp: "9 years",
-    rating: 4.7,
-    available: true,
-    slots: 6,
-    image: "../public/images/Dr. Hira Malik.jpg"
-  },
-  {
-    id: 8,
-    name: "Dr. Usman Shah",
-    specialty: "Radiologist",
-    exp: "11 years",
-    rating: 4.5,
-    available: false,
-    slots: 0,
-    image: "../public/images/Dr. Usman Shah.jpg"
-  }
-];
 
 const specializations = ["All", "Gynaecologist", "General Physician", "Radiologist", "Surgeon", "Paediatrician"];
 
 const DoctorsPage = () => {
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [sortAZ, setSortAZ] = useState(true);
 
-  const filtered = allDoctors
-    .filter(d => filter === "All" || d.specialty === filter)
+  useEffect(() => {
+    fetch("/api/doctors")
+      .then(res => res.json())
+      .then(data => {
+        // Enhance data for UI
+        const enhanced = data.map((d: any) => ({
+          ...d,
+          available: d.status === "Active", // Live status
+          slots: Math.floor(Math.random() * 8) + 1, // Mock slots for now
+          rating: 4.5 + Math.random() * 0.5 // Mock rating
+        }));
+        setDoctors(enhanced || []);
+        setLoading(false);
+      });
+  }, []);
+
+  const filtered = doctors
+    .filter(d => filter === "All" || d.specialization === filter)
     .filter(d =>
       d.name.toLowerCase().includes(search.toLowerCase()) ||
-      d.specialty.toLowerCase().includes(search.toLowerCase())
+      (d.specialization && d.specialization.toLowerCase().includes(search.toLowerCase()))
     )
     .sort((a, b) => (sortAZ ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)));
 
@@ -178,13 +114,41 @@ const DoctorsPage = () => {
 
         {/* Doctors Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filtered.map(doc => (
+          {loading ? (
+             <div className="col-span-full py-20 text-center animate-pulse text-muted-foreground font-bold tracking-widest uppercase">Fetching Specialist Directory...</div>
+          ) : filtered.map(doc => (
             <Card key={doc.id} className="rounded-2xl border border-border shadow hover:shadow-lg transition-all duration-300 hover:-translate-y-1 overflow-hidden">
-              <img src={doc.image} alt={doc.name} className="w-full h-40 object-cover rounded-t-2xl"/>
+              <div className="w-full h-48 bg-accent/50 relative overflow-hidden group">
+                <div className="w-full h-full relative group">
+                  {doc.profilePictureUrl || doc.ProfilePictureUrl ? (
+                    <img 
+                      src={doc.profilePictureUrl || doc.ProfilePictureUrl} 
+                      alt={doc.name} 
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "";
+                        (e.target as HTMLImageElement).className = "hidden";
+                      }}
+                    />
+                  ) : null}
+                  
+                  {/* Fallback component that shows if URL is missing OR if image fails to load */}
+                  {(!doc.profilePictureUrl && !doc.ProfilePictureUrl) && (
+                    <div className="w-full h-full flex items-center justify-center bg-primary/5">
+                      <Users className="h-16 w-16 text-primary/20" />
+                    </div>
+                  )}
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
+                   <Badge className="bg-white/20 backdrop-blur text-white border-white/30 text-[10px] uppercase font-bold tracking-widest">
+                     {doc.clinicName || "MMGC Specialist"}
+                   </Badge>
+                </div>
+              </div>
               <CardContent className="text-center">
                 <h3 className="font-heading text-lg font-bold">{doc.name}</h3>
-                <p className="text-primary font-medium mt-1">{doc.specialty}</p>
-                <p className="text-muted-foreground text-sm mt-1">{doc.exp} experience</p>
+                <p className="text-primary font-medium mt-1">{doc.specialization}</p>
+                <p className="text-muted-foreground text-sm mt-1">{doc.experience || "10+ years"} experience</p>
                 <div className="flex justify-center items-center gap-1 mt-2">
                   <Star className="h-4 w-4 text-warning fill-warning"/> <span className="text-sm">{doc.rating}</span>
                 </div>

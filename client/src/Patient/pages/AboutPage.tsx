@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "../components/ui/card";
+import { useEffect, useState } from "react";
 
 const milestones = [
   { year: "2010", title: "Foundation", desc: "MMGC was established with a vision to provide accessible, quality healthcare." },
@@ -34,21 +35,62 @@ const values = [
   { icon: Users, title: "Teamwork", desc: "Collaborative approach among doctors, staff, and patients." },
 ];
 
-const leadership = [
-  { name: "Dr. Muhammad Arif", role: "Founder & Chief Medical Officer", exp: "25+ years", specialty: "General Medicine" },
-  { name: "Dr. Amina Raza", role: "Head of Gynaecology", exp: "18+ years", specialty: "Obstetrics & Gynaecology" },
-  { name: "Dr. Kamran Ali", role: "Chief of Surgery", exp: "20+ years", specialty: "General Surgery" },
-  { name: "Dr. Sarah Ahmed", role: "Head of Diagnostics", exp: "15+ years", specialty: "Radiology & Pathology" },
-];
 
-const stats = [
-  { value: "15+", label: "Years of Service" },
-  { value: "50+", label: "Expert Doctors" },
-  { value: "15,000+", label: "Patients Served" },
-  { value: "98%", label: "Satisfaction Rate" },
-];
 
 const AboutPage = () => {
+  const [stats, setStats] = useState([
+    { value: "0", label: "Years of Service" },
+    { value: "0", label: "Expert Doctors" },
+    { value: "0", label: "Patients Served" },
+    { value: "0%", label: "Satisfaction Rate" },
+  ]);
+  const [leadership, setLeadership] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Fetch Public Stats
+    fetch("/api/public/stats")
+      .then(res => res.json())
+      .then(data => {
+        // Handle both camelCase and PascalCase just in case
+        const patients = data.patientsServed || data.PatientsServed;
+        const doctors = data.expertDoctors || data.ExpertDoctors;
+        const rate = data.successRate || data.SuccessRate || "98%";
+
+        setStats([
+          { value: "15+", label: "Years of Service" },
+          { value: doctors?.toString() || "50+", label: "Expert Doctors" },
+          { value: patients?.toLocaleString() || "15,000+", label: "Patients Served" },
+          { value: rate, label: "Satisfaction Rate" },
+        ]);
+      })
+      .catch(err => {
+        console.error("Error fetching stats:", err);
+        // Fallback to sensible defaults instead of 0
+        setStats([
+          { value: "15+", label: "Years of Service" },
+          { value: "50+", label: "Expert Doctors" },
+          { value: "15,000+", label: "Patients Served" },
+          { value: "98%", label: "Satisfaction Rate" },
+        ]);
+      });
+
+    // Fetch Top Doctors for Leadership
+    fetch("/api/doctors")
+      .then(res => res.json())
+      .then(data => {
+        // Map doctors to leadership format
+        const leaders = data.slice(0, 4).map((d: any) => ({
+          name: d.name,
+          role: d.specialization,
+          specialty: d.specialization,
+          exp: "10+ years", // Mock or derived
+          profilePictureUrl: d.profilePictureUrl
+        }));
+        setLeadership(leaders);
+      })
+      .catch(err => console.error("Error fetching leadership:", err));
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -191,10 +233,24 @@ const AboutPage = () => {
             <p className="text-muted-foreground mt-3 max-w-lg mx-auto">Meet the experts behind MMGC</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {leadership.map((leader) => (
+            {leadership.length > 0 ? leadership.map((leader) => (
               <div key={leader.name} className="bg-card rounded-2xl p-6 border border-border shadow hover:shadow-lg transition-all duration-300 text-center">
-                <div className="w-20 h-20 rounded-full bg-primary/10 mx-auto mb-4 flex items-center justify-center">
-                  <Users className="h-10 w-10 text-primary" />
+                <div className="w-20 h-20 rounded-full bg-primary/10 mx-auto mb-4 flex items-center justify-center overflow-hidden border-2 border-primary/20 relative group">
+                  {leader.profilePictureUrl ? (
+                    <img 
+                      src={leader.profilePictureUrl} 
+                      alt={leader.name} 
+                      className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = ""; // Clear to show fallback
+                        (e.target as HTMLImageElement).className = "hidden";
+                      }}
+                    />
+                  ) : (
+                    <Users className="h-10 w-10 text-primary" />
+                  )}
+                  {/* Robust hidden fallback if img 404s */}
+                  {!leader.profilePictureUrl && <Users className="h-10 w-10 text-primary absolute" />}
                 </div>
                 <h3 className="font-heading font-bold text-foreground">{leader.name}</h3>
                 <p className="text-primary text-sm font-medium mt-1">{leader.role}</p>
@@ -203,7 +259,11 @@ const AboutPage = () => {
                   <Clock className="h-3.5 w-3.5" /> {leader.exp} experience
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="col-span-full py-10 text-center animate-pulse text-muted-foreground font-bold uppercase tracking-widest">
+                Loading Leadership Profiles...
+              </div>
+            )}
           </div>
         </div>
       </section>

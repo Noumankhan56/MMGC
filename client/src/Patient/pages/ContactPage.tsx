@@ -14,16 +14,35 @@ import heroImage from "../assets/hero-medical.jpg";
 const ContactPage = () => {
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [agree, setAgree] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!agree) {
       toast.error("You must agree to the terms and conditions.");
       return;
     }
-    toast.success("Message sent! We'll get back to you soon.");
-    setForm({ name: "", email: "", subject: "", message: "" });
-    setAgree(false);
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/public/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
+
+      if (!res.ok) throw new Error("Failed to send message");
+
+      const data = await res.json();
+      toast.success(data.message || "Message sent! We'll get back to you soon.");
+      setForm({ name: "", email: "", subject: "", message: "" });
+      setAgree(false);
+    } catch (err) {
+      console.error("Contact error:", err);
+      toast.error("Failed to send message. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const contactMethods = [
@@ -185,9 +204,14 @@ const ContactPage = () => {
               size="lg"
               type="submit"
               className="w-full flex items-center justify-center bg-primary hover:bg-primary/90 text-white"
-              disabled={!agree}
+              disabled={!agree || loading}
             >
-              <Send className="h-4 w-4 mr-2" /> Send Message
+              {loading ? (
+                <Activity className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              {loading ? "Sending..." : "Send Message"}
             </Button>
           </form>
 

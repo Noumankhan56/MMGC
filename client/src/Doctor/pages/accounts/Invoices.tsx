@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { MainLayout } from "@/Doctor/components/layout/MainLayout";
 import {
   Receipt,
@@ -7,11 +8,13 @@ import {
   Download,
   Eye,
   Printer,
-  IndianRupee,
   TrendingUp,
   Clock,
   CheckCircle2,
   XCircle,
+  FileText,
+  History,
+  MoreVertical,
 } from "lucide-react";
 import { Button } from "@/Doctor/components/ui/button";
 import { Input } from "@/Doctor/components/ui/input";
@@ -23,251 +26,194 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/Doctor/components/ui/select";
+import { toast } from "sonner";
+import { cn } from "@/Doctor/lib/utils";
 
 interface Invoice {
-  id: string;
+  id: number;
   invoiceNumber: string;
+  generatedAt: string;
   patientName: string;
-  mrNumber: string;
-  date: string;
   amount: number;
-  paidAmount: number;
-  status: "paid" | "partial" | "pending" | "overdue";
-  services: string[];
+  isPaid: boolean;
+  isRefunded: boolean;
+  paymentMethod: string;
 }
 
-const invoices: Invoice[] = [
-  {
-    id: "1",
-    invoiceNumber: "INV-2024-0156",
-    patientName: "Priya Sharma",
-    mrNumber: "MR-2024-001",
-    date: "Today",
-    amount: 15000,
-    paidAmount: 15000,
-    status: "paid",
-    services: ["OPD Consultation", "Ultrasound"],
-  },
-  {
-    id: "2",
-    invoiceNumber: "INV-2024-0155",
-    patientName: "Sunita Verma",
-    mrNumber: "MR-2024-056",
-    date: "Today",
-    amount: 85000,
-    paidAmount: 50000,
-    status: "partial",
-    services: ["C-Section", "Hospital Stay (3 days)"],
-  },
-  {
-    id: "3",
-    invoiceNumber: "INV-2024-0154",
-    patientName: "Anita Patel",
-    mrNumber: "MR-2024-015",
-    date: "Yesterday",
-    amount: 5500,
-    paidAmount: 0,
-    status: "pending",
-    services: ["Lab Tests", "Ultrasound"],
-  },
-  {
-    id: "4",
-    invoiceNumber: "INV-2024-0150",
-    patientName: "Kavita Singh",
-    mrNumber: "MR-2024-042",
-    date: "3 days ago",
-    amount: 3500,
-    paidAmount: 0,
-    status: "overdue",
-    services: ["OPD Consultation"],
-  },
-  {
-    id: "5",
-    invoiceNumber: "INV-2024-0153",
-    patientName: "Meera Gupta",
-    mrNumber: "MR-2024-023",
-    date: "Yesterday",
-    amount: 12000,
-    paidAmount: 12000,
-    status: "paid",
-    services: ["Lab Tests", "Consultation", "Medicines"],
-  },
-];
-
-const statusConfig = {
-  paid: { label: "Paid", className: "bg-success/10 text-success", icon: CheckCircle2 },
-  partial: { label: "Partial", className: "bg-warning/10 text-warning", icon: Clock },
-  pending: { label: "Pending", className: "bg-muted text-muted-foreground", icon: Clock },
-  overdue: { label: "Overdue", className: "bg-destructive/10 text-destructive", icon: XCircle },
-};
-
 export default function Invoices() {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+
+  useEffect(() => {
+    fetchInvoices();
+  }, []);
+
+  const fetchInvoices = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/invoices");
+      const data = await res.json();
+      setInvoices(data);
+    } catch {
+      toast.error("Failed to load invoice records");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const filteredInvoices = invoices.filter((i) => {
+    const matchesSearch = 
+      i.invoiceNumber.toLowerCase().includes(search.toLowerCase()) || 
+      i.patientName.toLowerCase().includes(search.toLowerCase());
+    
+    if (filter === "paid") return matchesSearch && i.isPaid && !i.isRefunded;
+    if (filter === "refunded") return matchesSearch && i.isRefunded;
+    return matchesSearch;
+  });
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-foreground">
-              Invoices & Billing
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
+              <Receipt className="h-8 w-8 text-primary" /> Invoice Management (FR15.1)
             </h1>
             <p className="text-muted-foreground mt-1">
-              Manage patient invoices and payments
+              Generate, track, and manage all patient billing records and fiscal history.
             </p>
           </div>
-          <Button className="bg-gradient-primary text-primary-foreground hover:opacity-90">
-            <Plus className="h-4 w-4 mr-2" />
-            Create Invoice
+          <Button className="bg-primary hover:bg-primary/95 text-primary-foreground h-12 px-6 rounded-2xl font-black shadow-lg shadow-primary/20 gap-2">
+            <Plus className="h-5 w-5" /> New Billable Entry
           </Button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-card rounded-xl border border-border/50 p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
-                <IndianRupee className="h-5 w-5 text-success" />
+        {/* Stats Summary */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          {[
+            { label: "Total Invoices", value: invoices.length, icon: FileText, color: "text-primary" },
+            { label: "Pending Payment", value: invoices.filter(i => !i.isPaid).length, icon: Clock, color: "text-warning" },
+            { label: "Refunded Bills", value: invoices.filter(i => i.isRefunded).length, icon: History, color: "text-destructive" },
+            { label: "Rejuvenated", value: "+18%", icon: TrendingUp, color: "text-success" },
+          ].map((stat) => (
+            <div key={stat.label} className="bg-card rounded-3xl border border-border/50 p-6 flex flex-col items-center text-center shadow-sm hover:shadow-xl transition-all duration-500 group">
+              <div className="w-12 h-12 rounded-2xl bg-muted/30 group-hover:bg-muted/50 flex items-center justify-center mb-3 transition-colors">
+                 <stat.icon className={cn("h-6 w-6", stat.color)} />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">₹2.4L</p>
-                <p className="text-sm text-muted-foreground">Today's Collection</p>
-              </div>
+              <p className="text-2xl font-black text-foreground tracking-tight">{stat.value}</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mt-1">{stat.label}</p>
             </div>
-          </div>
-          <div className="bg-card rounded-xl border border-border/50 p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-warning" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">₹85K</p>
-                <p className="text-sm text-muted-foreground">Pending Amount</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-card rounded-xl border border-border/50 p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
-                <XCircle className="h-5 w-5 text-destructive" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">₹12K</p>
-                <p className="text-sm text-muted-foreground">Overdue</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-card rounded-xl border border-border/50 p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">₹18.5L</p>
-                <p className="text-sm text-muted-foreground">This Month</p>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search invoices..." className="pl-10 bg-card" />
-          </div>
-          <Select defaultValue="all">
-            <SelectTrigger className="w-full sm:w-[160px] bg-card">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="partial">Partial</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline">
-            <Filter className="h-4 w-4 mr-2" />
-            More Filters
-          </Button>
+        {/* Action Bar */}
+        <div className="bg-card/60 backdrop-blur-md p-6 rounded-3xl border border-border/50 shadow-sm flex flex-col md:flex-row gap-4 items-center">
+            <div className="relative flex-1 w-full max-w-xl group">
+               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+               <Input 
+                 placeholder="Search by Invoice # or Patient Name..." 
+                 className="pl-10 h-12 rounded-2xl bg-background/50 border-0 shadow-inner font-medium text-lg ring-offset-background group-focus-within:ring-2 group-focus-within:ring-primary/20 transition-all"
+                 value={search}
+                 onChange={(e) => setSearch(e.target.value)}
+               />
+            </div>
+            
+            <Select value={filter} onValueChange={setFilter}>
+                <SelectTrigger className="w-[200px] h-12 bg-background/50 border-0 rounded-2xl font-bold shadow-inner">
+                   <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                   <SelectItem value="all">All Invoices</SelectItem>
+                   <SelectItem value="paid">Paid & Cleared</SelectItem>
+                   <SelectItem value="refunded">Refunded Records</SelectItem>
+                </SelectContent>
+            </Select>
+
+            <Button variant="outline" className="h-12 w-12 rounded-2x p-0 border-border/50">
+               <Filter className="h-5 w-5" />
+            </Button>
         </div>
 
-        {/* Invoices List */}
-        <div className="space-y-4">
-          {invoices.map((invoice) => {
-            const StatusIcon = statusConfig[invoice.status].icon;
-            const balance = invoice.amount - invoice.paidAmount;
-
-            return (
-              <div
-                key={invoice.id}
-                className="bg-card rounded-xl border border-border/50 shadow-card p-5 hover:shadow-card-hover transition-all duration-300"
-              >
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                      <Receipt className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-3 mb-1">
-                        <h3 className="font-semibold text-foreground">{invoice.invoiceNumber}</h3>
-                        <Badge className={statusConfig[invoice.status].className}>
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {statusConfig[invoice.status].label}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {invoice.patientName} • {invoice.mrNumber}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {invoice.services.join(" • ")}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 lg:gap-8">
-                    <div className="text-left sm:text-right">
-                      <p className="text-lg font-bold text-foreground">
-                        {formatCurrency(invoice.amount)}
-                      </p>
-                      {invoice.status === "partial" && (
-                        <p className="text-sm text-warning">
-                          Balance: {formatCurrency(balance)}
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground">{invoice.date}</p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" className="h-9 w-9">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-9 w-9">
-                        <Printer className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-9 w-9">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      {invoice.status !== "paid" && (
-                        <Button size="sm" variant="default" className="bg-success hover:bg-success/90">
-                          Record Payment
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        {/* Invoice Records */}
+        <div className="bg-card rounded-[32px] border border-border/50 shadow-2xl shadow-black/5 overflow-hidden">
+           <div className="p-6 bg-muted/20 border-b border-border/50 flex items-center justify-between">
+              <h3 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Recent Invoices (FR15.1)</h3>
+              <Badge variant="outline" className="rounded-xl font-bold uppercase text-[9px] tracking-widest">Live Audit</Badge>
+           </div>
+           <div className="overflow-x-auto">
+             <table className="w-full text-sm text-left">
+                <thead className="bg-muted/10 text-muted-foreground font-black uppercase tracking-widest text-[9px] border-b border-sidebar-border">
+                  <tr>
+                    <th className="p-6">Invoice Identifier</th>
+                    <th className="p-6">Patient Entity</th>
+                    <th className="p-6">Generation Date</th>
+                    <th className="p-6">Fiscal Status</th>
+                    <th className="p-6 text-center">Interactive</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                   {loading ? (
+                       <tr><td colSpan={5} className="p-20 text-center animate-pulse italic text-muted-foreground">Accessing billing ledger...</td></tr>
+                   ) : filteredInvoices.length === 0 ? (
+                       <tr><td colSpan={5} className="p-20 text-center text-muted-foreground italic">No invoice records found.</td></tr>
+                   ) : (
+                     filteredInvoices.map((inv) => (
+                       <tr key={inv.id} className="hover:bg-primary/[0.01] transition-all group border-l-4 border-l-transparent hover:border-l-primary/40">
+                          <td className="p-6">
+                             <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                                   <Receipt className="h-5 w-5" />
+                                </div>
+                                <span className="font-black text-foreground text-lg uppercase tracking-tighter">{inv.invoiceNumber}</span>
+                             </div>
+                          </td>
+                          <td className="p-6 font-bold text-foreground/80 tracking-tight text-base">
+                             {inv.patientName}
+                          </td>
+                          <td className="p-6">
+                             <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5 mt-1">
+                                <Clock className="h-3 w-3" /> {inv.generatedAt}
+                             </span>
+                          </td>
+                          <td className="p-6">
+                             <div className="flex flex-col gap-1">
+                                <span className={cn("text-lg font-black tracking-tighter", inv.isRefunded && "line-through opacity-40")}>
+                                   Rs. {inv.amount.toLocaleString()}
+                                </span>
+                                {inv.isRefunded ? (
+                                   <Badge className="bg-destructive/10 text-destructive border-destructive/20 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg w-fit">REFUNDED</Badge>
+                                ) : inv.isPaid ? (
+                                   <Badge className="bg-success/10 text-success border-success/20 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg w-fit">CLEARED</Badge>
+                                ) : (
+                                   <Badge className="bg-warning/10 text-warning border-warning/20 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg w-fit">PENDING</Badge>
+                                )}
+                             </div>
+                          </td>
+                          <td className="p-6 text-center">
+                             <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-primary/5 hover:text-primary">
+                                   <Eye className="h-5 w-5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-primary/5 hover:text-primary">
+                                   <Printer className="h-5 w-5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-primary/5 hover:text-primary">
+                                   <Download className="h-5 w-5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl">
+                                   <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                             </div>
+                          </td>
+                       </tr>
+                     ))
+                   )}
+                </tbody>
+             </table>
+           </div>
         </div>
       </div>
     </MainLayout>
